@@ -464,10 +464,10 @@ private:
 	TThostFtdcInvestorIDType m_InvestorID;
 	TThostFtdcUserIDType m_UserID;
 	TThostFtdcBrokerIDType m_BrokerID;
-	TTORATstpShareholderIDType	m_ShareholderID_SSE;
-	TTORATstpShareholderIDType	m_ShareholderID_SZSE;
-	TTORATstpShareholderIDType	m_ShareholderID_BSE;
-	TTORATstpShareholderIDType	m_ShareholderID_HKEX;
+	//TTORATstpShareholderIDType	m_ShareholderID_SSE;
+	//TTORATstpShareholderIDType	m_ShareholderID_SZSE;
+	//TTORATstpShareholderIDType	m_ShareholderID_BSE;
+	//TTORATstpShareholderIDType	m_ShareholderID_HKEX;
 
 	TThostFtdcFrontIDType m_FrontID;
 	TThostFtdcSessionIDType m_SessionID;
