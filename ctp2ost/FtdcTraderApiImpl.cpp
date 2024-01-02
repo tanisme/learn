@@ -445,8 +445,8 @@ int CFtdcTraderApiImpl::ReqQryOrder(CThostFtdcQryOrderField *pQryOrder, int nReq
 
 ///成交单查询请求
 int CFtdcTraderApiImpl::ReqQryTrade(CThostFtdcQryTradeField *pQryTrade, int nRequestID)
-{	
-	CTORATstpQryTradeField Req;
+{
+    CThostFtdcQryTradeField Req = {0};
 	memset(&Req, 0, sizeof(Req));
 
 	if (strcmp(pQryTrade->ExchangeID, EXCHANGE_SH) == 0) {

@@ -11,7 +11,6 @@ else()
 endif()
 
 add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
-message(WARNING "${PROJECT_SOURCE_DIR}/../traderapi")
 include_directories(${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/../traderapi ../)
 if (WIN32)
   if (CMAKE_CL_64)
