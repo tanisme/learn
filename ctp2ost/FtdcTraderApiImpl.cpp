@@ -43,9 +43,9 @@ CFtdcTraderApiImpl::CFtdcTraderApiImpl(const char *pszFlowPath)
 	memset(m_BrokerID,0x00,sizeof(m_BrokerID));
 	memset(m_UserID, 0x00, sizeof(m_UserID));
 	memset(m_InvestorID, 0x00, sizeof(m_InvestorID));
-	memset(m_ShareholderID_SSE, 0x00, sizeof(m_ShareholderID_SSE));
-	memset(m_ShareholderID_SZSE, 0x00, sizeof(m_ShareholderID_SZSE));
-	memset(m_ShareholderID_HKEX, 0x00, sizeof(m_ShareholderID_HKEX));
+	//memset(m_ShareholderID_SSE, 0x00, sizeof(m_ShareholderID_SSE));
+	//memset(m_ShareholderID_SZSE, 0x00, sizeof(m_ShareholderID_SZSE));
+	//memset(m_ShareholderID_HKEX, 0x00, sizeof(m_ShareholderID_HKEX));
 	ThostRspInfoNotSupported.ErrorID = 99;
 	strncpy(ThostRspInfoNotSupported.ErrorMsg, "Not supported",sizeof(ThostRspInfoNotSupported.ErrorMsg)-1);
 }
@@ -85,43 +85,25 @@ void CFtdcTraderApiImpl::RegisterFront(char *pszFrontAddress)
 void CFtdcTraderApiImpl::RegisterFensUserInfo(CThostFtdcFensUserInfoField * pFensUserInfo)
 {
 }
+
 void CFtdcTraderApiImpl::RegisterNameServer(char *pszNsAddress)
 {
-	// tcp://ip:port/EnvID/NodeID
-	//std::string NameServer,EnvID,NodeID;
-	//std::regex pattern("(.*://.*:.*)/(.*)/(.*)");
-	//std::smatch results;
-	//std::string target(pszNsAddress);
-	//if(std::regex_search(target,results,pattern)){
-	//	NameServer = results[1];
-	//	EnvID = results[2];
-	//	NodeID = results[3];
-
-	//	CTORATstpFensUserInfoField FensUserInfo;
-
-	//	memset(&FensUserInfo,0x00,sizeof(FensUserInfo));
-	//	strncpy(FensUserInfo.FensEnvID,EnvID.c_str(),sizeof(FensUserInfo.FensEnvID)-1);
-	//	strncpy(FensUserInfo.FensNodeID,NodeID.c_str(),sizeof(FensUserInfo.FensNodeID)-1);
-	//	m_pUserApi->RegisterFensUserInfo(&FensUserInfo);
-	//	m_pUserApi->RegisterNameServer((char*)NameServer.c_str());
-	//}
 }
 
 void CFtdcTraderApiImpl::RegisterSpi(CThostFtdcTraderSpi *pSpi)
 {
 	m_pSpi = pSpi;
-	if(!pSpi)
-		m_pUserApi->RegisterSpi(NULL);
+	if(!pSpi) m_pUserApi->RegisterSpi(nullptr);
 }
 		
 void CFtdcTraderApiImpl::SubscribePrivateTopic(THOST_TE_RESUME_TYPE nResumeType)
 {
-	m_pUserApi->SubscribePrivateTopic((TORA_TE_RESUME_TYPE)nResumeType);
+	m_pUserApi->SubscribePrivateTopic((UT_TE_RESUME_TYPE)nResumeType);
 }
 
 void CFtdcTraderApiImpl::SubscribePublicTopic(THOST_TE_RESUME_TYPE nResumeType)
 {
-	m_pUserApi->SubscribePublicTopic((TORA_TE_RESUME_TYPE)nResumeType);
+	m_pUserApi->SubscribePublicTopic((UT_TE_RESUME_TYPE)nResumeType);
 }
 
 void CFtdcTraderApiImpl::OnTime(const boost::system::error_code& err)
@@ -137,393 +119,297 @@ void CFtdcTraderApiImpl::OnTime(const boost::system::error_code& err)
 	m_pTimer->async_wait(boost::bind(&CFtdcTraderApiImpl::OnTime, this, boost::asio::placeholders::error));
 }
 
-///用户登录请求
 int CFtdcTraderApiImpl::ReqUserLogin(CThostFtdcReqUserLoginField *pReqUserLogin, int nRequestID)
 {
 	strncpy(m_BrokerID, pReqUserLogin->BrokerID, sizeof(m_BrokerID) - 1);
 	strncpy(m_UserID, pReqUserLogin->UserID, sizeof(m_UserID) - 1);
 	strncpy(m_InvestorID, pReqUserLogin->UserID, sizeof(m_InvestorID) - 1);
 
-	CUTReqLoginField LoginReq;
-
-	memset(&LoginReq,0x00,sizeof(LoginReq));
-	//LoginReq.LogInAccountType=TORA_TSTP_LACT_UserID;
-	//strncpy(LoginReq.DepartmentID, pReqUserLogin->BrokerID, sizeof(LoginReq.DepartmentID) - 1);
-	strncpy(LoginReq.UserID,pReqUserLogin->UserID,sizeof(LoginReq.UserID)-1);
-	strncpy(LoginReq.Password,pReqUserLogin->Password,sizeof(LoginReq.Password)-1);
-	strncpy(LoginReq.UserProductInfo,pReqUserLogin->UserProductInfo,sizeof(LoginReq.UserProductInfo)-1);
-	//snprintf(LoginReq.TerminalInfo,sizeof(LoginReq.TerminalInfo),"PC;IIP=NA;IPORT=NA;LIP=%s;MAC=%s;HD=%s;@%s",
+    CUTReqLoginField Req = {0};
+	strncpy(Req.UserID,pReqUserLogin->UserID,sizeof(Req.UserID)-1);
+	strncpy(Req.Password,pReqUserLogin->Password,sizeof(Req.Password)-1);
+	strncpy(Req.UserProductInfo,pReqUserLogin->UserProductInfo,sizeof(Req.UserProductInfo)-1);
+	//snprintf(Req.TerminalInfo,sizeof(Req.TerminalInfo),"PC;IIP=NA;IPORT=NA;LIP=%s;MAC=%s;HD=%s;@%s",
 	//	pReqUserLogin->ClientIPAddress,pReqUserLogin->MacAddress,pReqUserLogin->LoginRemark,pReqUserLogin->UserProductInfo);
-	return m_pUserApi->ReqUserLogin(&LoginReq, nRequestID);
+	return m_pUserApi->ReqLogin(&Req, nRequestID);
 }
 
-///用户退出请求
+void CFtdcTraderApiImpl::OnRspLogin(CUTRspLoginField *pRspLogin, CUTRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
+{
+    CThostFtdcRspUserLoginField* pCTPRspLogin = nullptr;
+    CThostFtdcRspInfoField* pCTPRspInfo = nullptr;
+
+    if(m_pSpi) {
+        CThostFtdcRspUserLoginField CTPRspLogin = {0};
+        CThostFtdcRspInfoField CTPRspInfo = {0};
+        if (pRspLogin) {
+            strncpy(CTPRspLogin.TradingDay, TradingDay, sizeof(CTPRspLogin.TradingDay)-1);
+            strncpy(CTPRspLogin.BrokerID,m_BrokerID, sizeof(CTPRspLogin.BrokerID) - 1);
+            strncpy(CTPRspLogin.UserID,m_UserID, sizeof(CTPRspLogin.UserID) - 1);
+            CTPRspLogin.FrontID = pRspLogin->FrontID;
+            CTPRspLogin.SessionID = pRspLogin->SessionID;
+            //snprintf(ThostRspUserLogin.MaxOrderRef, sizeof(CTPRspLogin.MaxOrderRef), "%d", pRspLogin->MaxOrderRef+1);
+            strncpy(CTPRspLogin.SystemName, pRspLogin->SystemName, sizeof(CTPRspLogin.SystemName) - 1);
+            //strncpy(CTPRspLogin.CZCETime, pRspLogin->LoginTime, sizeof(CTPRspLogin.CZCETime) - 1);
+            //strncpy(CTPRspLogin.TradingDay, pRspLogin->TradingDay, sizeof(CTPRspLogin.TradingDay) - 1);
+            //strncpy(CTPRspLogin.SHFETime, pRspLogin->LoginTime, sizeof(CTPRspLogin.SHFETime) - 1);
+            //strncpy(CTPRspLogin.DCETime, pRspLogin->LoginTime, sizeof(CTPRspLogin.DCETime) - 1);
+            //strncpy(CTPRspLogin.FFEXTime, pRspLogin->LoginTime, sizeof(CTPRspLogin.FFEXTime) - 1);
+            //strncpy(CTPRspLogin.INETime, pRspLogin->LoginTime, sizeof(CTPRspLogin.INETime) - 1);
+            m_FrontID = CTPRspLogin.FrontID;
+            m_SessionID = CTPRspLogin.SessionID;
+            pCTPRspLogin = &CTPRspLogin;
+        }
+
+        if (pRspInfo) {
+            CTPRspInfo.ErrorID = pRspInfo->ErrorID;
+            strncpy(CTPRspInfo.ErrorMsg,pRspInfo->ErrorMsg,sizeof(CTPRspInfo.ErrorMsg)-1);
+            pCTPRspInfo = &CTPRspInfo;
+        }
+
+        // 查询股东账号
+        //CTORATstpQryShareholderAccountField Req;
+        //memset(&Req, 0x00, sizeof(Req));
+        //m_pUserApi->ReqQryShareholderAccount(&Req, 0);
+    }
+    m_pSpi->OnRspUserLogin(pCTPRspLogin, pCTPRspInfo, nRequestID, bIsLast);
+}
+
 int CFtdcTraderApiImpl::ReqUserLogout(CThostFtdcUserLogoutField *pUserLogout, int nRequestID)
 {
-	CUTReqLogoutField LogoutReq = {0};
-
-	memset(&LogoutReq,0x00,sizeof(LogoutReq));
-	strncpy(LogoutReq.UserID, pUserLogout->UserID,sizeof(LogoutReq.UserID)-1);
-	return m_pUserApi->ReqUserLogout(&LogoutReq, nRequestID);
+    CUTReqLogoutField Req = {0};
+	strncpy(Req.UserID, pUserLogout->UserID,sizeof(Req.UserID)-1);
+	return m_pUserApi->ReqLogout(&Req, nRequestID);
 }
 
-///用户密码修改请求
 int CFtdcTraderApiImpl::ReqUserPasswordUpdate(CThostFtdcUserPasswordUpdateField *pUserPasswordUpdate, int nRequestID)
 {
-    CUTUserPasswordUpdateField UserPasswordUpdate = {0};
-
-	memset(&UserPasswordUpdate,0,sizeof(UserPasswordUpdate));
-	strncpy(UserPasswordUpdate.UserID,pUserPasswordUpdate->UserID,sizeof(UserPasswordUpdate.UserID)-1);
-	strncpy(UserPasswordUpdate.OldPassword,pUserPasswordUpdate->OldPassword,sizeof(UserPasswordUpdate.OldPassword)-1);
-	strncpy(UserPasswordUpdate.NewPassword,pUserPasswordUpdate->NewPassword,sizeof(UserPasswordUpdate.NewPassword)-1);
-
-	return m_pUserApi->ReqUserPasswordUpdate(&UserPasswordUpdate, nRequestID);
+    CUTUserPasswordUpdateField Req = {0};
+	strncpy(Req.UserID,pUserPasswordUpdate->UserID,sizeof(Req.UserID)-1);
+	strncpy(Req.OldPassword,pUserPasswordUpdate->OldPassword,sizeof(Req.OldPassword)-1);
+	strncpy(Req.NewPassword,pUserPasswordUpdate->NewPassword,sizeof(Req.NewPassword)-1);
+	return m_pUserApi->ReqUserPasswordUpdate(&Req, nRequestID);
 }
+
+void CFtdcTraderApiImpl::OnRspUserPasswordUpdate(CUTUserPasswordUpdateField *pUserPasswordUpdate, CUTRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
+{
+    CThostFtdcUserPasswordUpdateField* pCTPUserPasswordUpdate = nullptr;
+    CThostFtdcRspInfoField* pCTPRspInfo = nullptr;
+
+    if (m_pSpi) {
+        CThostFtdcUserPasswordUpdateField CTPUserPasswordUpdate = {0};
+        CThostFtdcRspInfoField CTPRspInfo = {0};
+        if (pUserPasswordUpdate) {
+        	strncpy(CTPUserPasswordUpdate.UserID, pUserPasswordUpdate->UserID,sizeof(CTPUserPasswordUpdate.UserID)-1);
+        	strncpy(CTPUserPasswordUpdate.OldPassword, pUserPasswordUpdate->OldPassword,sizeof(CTPUserPasswordUpdate.OldPassword)-1);
+        	strncpy(CTPUserPasswordUpdate.NewPassword, pUserPasswordUpdate->NewPassword,sizeof(CTPUserPasswordUpdate.NewPassword)-1);
+        	pCTPUserPasswordUpdate = &CTPUserPasswordUpdate;
+        }
+
+        if (pRspInfo) {
+            CTPRspInfo.ErrorID = pRspInfo->ErrorID;
+            strncpy(CTPRspInfo.ErrorMsg,pRspInfo->ErrorMsg,sizeof(CTPRspInfo.ErrorMsg)-1);
+            pCTPRspInfo = &CTPRspInfo;
+        }
+    }
+    m_pSpi->OnRspUserPasswordUpdate(pCTPUserPasswordUpdate, pCTPRspInfo, nRequestID, bIsLast);
+}
+
 
 ///报单录入请求
 int CFtdcTraderApiImpl::ReqOrderInsert(CThostFtdcInputOrderField *pInputOrder, int nRequestID)
 {
-	CTORATstpInputOrderField Req;
-	memset(&Req, 0, sizeof(Req));
-	strcpy(Req.InvestorID, pInputOrder->InvestorID);
-	strcpy(Req.SecurityID, pInputOrder->InstrumentID);
-	Req.OrderRef = atol(pInputOrder->OrderRef);
+    CUTInputOrderField Req = {0};
+	//strcpy(Req.InvestorID, pInputOrder->InvestorID);
+	//strcpy(Req.SecurityID, pInputOrder->InstrumentID);
+	//Req.OrderRef = atol(pInputOrder->OrderRef);
 
-	if (strcmp(pInputOrder->ExchangeID, EXCHANGE_SH) == 0) {
-		strcpy(Req.ShareholderID, m_ShareholderID_SSE);
-		Req.ExchangeID = TORA_TSTP_EXD_SSE;
-	}
-	else if (strcmp(pInputOrder->ExchangeID, EXCHANGE_SZ) == 0) {
-		strcpy(Req.ShareholderID, m_ShareholderID_SZSE);
-		Req.ExchangeID = TORA_TSTP_EXD_SZSE;
-	}
-	else if (strcmp(pInputOrder->ExchangeID, EXCHANGE_BSE) == 0) {
-		strcpy(Req.ShareholderID, m_ShareholderID_BSE);
-		Req.ExchangeID = TORA_TSTP_EXD_BSE;
-	}
-	else if (strlen(pInputOrder->ExchangeID) > 0) {
-		strcpy(Req.ShareholderID, m_ShareholderID_HKEX);
-		Req.ExchangeID = TORA_TSTP_EXD_HK;
-	}
+	//if (strcmp(pInputOrder->ExchangeID, EXCHANGE_SH) == 0) {
+	//	strcpy(Req.ShareholderID, m_ShareholderID_SSE);
+	//	Req.ExchangeID = TORA_TSTP_EXD_SSE;
+	//}
+	//else if (strcmp(pInputOrder->ExchangeID, EXCHANGE_SZ) == 0) {
+	//	strcpy(Req.ShareholderID, m_ShareholderID_SZSE);
+	//	Req.ExchangeID = TORA_TSTP_EXD_SZSE;
+	//}
+	//else if (strcmp(pInputOrder->ExchangeID, EXCHANGE_BSE) == 0) {
+	//	strcpy(Req.ShareholderID, m_ShareholderID_BSE);
+	//	Req.ExchangeID = TORA_TSTP_EXD_BSE;
+	//}
+	//else if (strlen(pInputOrder->ExchangeID) > 0) {
+	//	strcpy(Req.ShareholderID, m_ShareholderID_HKEX);
+	//	Req.ExchangeID = TORA_TSTP_EXD_HK;
+	//}
 
-	Req.Direction = pInputOrder->Direction == THOST_FTDC_D_Buy ? TORA_TSTP_D_Buy : TORA_TSTP_D_Sell;
+	//Req.Direction = pInputOrder->Direction == THOST_FTDC_D_Buy ? TORA_TSTP_D_Buy : TORA_TSTP_D_Sell;
 
-	switch (pInputOrder->OrderPriceType) {
-	case THOST_FTDC_OPT_AnyPrice:
-		Req.OrderPriceType = TORA_TSTP_OPT_AnyPrice;
-		break;
-	case THOST_FTDC_OPT_LimitPrice:
-		Req.OrderPriceType = TORA_TSTP_OPT_LimitPrice;
-		break;
-	case THOST_FTDC_OPT_BestPrice:
-		Req.OrderPriceType = TORA_TSTP_OPT_BestPrice;
-		break;
-	default:
-		break;
-	}
+	//switch (pInputOrder->OrderPriceType) {
+	//case THOST_FTDC_OPT_AnyPrice:
+	//	Req.OrderPriceType = TORA_TSTP_OPT_AnyPrice;
+	//	break;
+	//case THOST_FTDC_OPT_LimitPrice:
+	//	Req.OrderPriceType = TORA_TSTP_OPT_LimitPrice;
+	//	break;
+	//case THOST_FTDC_OPT_BestPrice:
+	//	Req.OrderPriceType = TORA_TSTP_OPT_BestPrice;
+	//	break;
+	//default:
+	//	break;
+	//}
 
-	Req.LimitPrice = pInputOrder->LimitPrice;
-	Req.VolumeTotalOriginal = pInputOrder->VolumeTotalOriginal;
+	//Req.LimitPrice = pInputOrder->LimitPrice;
+	//Req.VolumeTotalOriginal = pInputOrder->VolumeTotalOriginal;
 
-	switch (pInputOrder->TimeCondition) {
-	case THOST_FTDC_TC_IOC:
-		Req.TimeCondition = TORA_TSTP_TC_IOC;
-		break;
-	case THOST_FTDC_TC_GFS:
-		Req.TimeCondition = TORA_TSTP_TC_GFS;
-		break;
-	case THOST_FTDC_TC_GFD:
-		Req.TimeCondition = TORA_TSTP_TC_GFD;
-		break;
-	case THOST_FTDC_TC_GTD:
-		Req.TimeCondition = TORA_TSTP_TC_GTD;
-		break;
-	case THOST_FTDC_TC_GTC:
-		Req.TimeCondition = TORA_TSTP_TC_GTC;
-		break;
-	case THOST_FTDC_TC_GFA:
-		Req.TimeCondition = TORA_TSTP_TC_GFA;
-		break;
-	default:
-		break;
-	}
+	//switch (pInputOrder->TimeCondition) {
+	//case THOST_FTDC_TC_IOC:
+	//	Req.TimeCondition = TORA_TSTP_TC_IOC;
+	//	break;
+	//case THOST_FTDC_TC_GFS:
+	//	Req.TimeCondition = TORA_TSTP_TC_GFS;
+	//	break;
+	//case THOST_FTDC_TC_GFD:
+	//	Req.TimeCondition = TORA_TSTP_TC_GFD;
+	//	break;
+	//case THOST_FTDC_TC_GTD:
+	//	Req.TimeCondition = TORA_TSTP_TC_GTD;
+	//	break;
+	//case THOST_FTDC_TC_GTC:
+	//	Req.TimeCondition = TORA_TSTP_TC_GTC;
+	//	break;
+	//case THOST_FTDC_TC_GFA:
+	//	Req.TimeCondition = TORA_TSTP_TC_GFA;
+	//	break;
+	//default:
+	//	break;
+	//}
 
-	switch (pInputOrder->VolumeCondition) {
-	case THOST_FTDC_VC_AV:
-		Req.VolumeCondition = TORA_TSTP_VC_AV;
-		break;
-	case THOST_FTDC_VC_MV:
-		Req.VolumeCondition = TORA_TSTP_VC_MV;
-		break;
-	case THOST_FTDC_VC_CV:
-		Req.VolumeCondition = TORA_TSTP_VC_CV;
-		break;
-	default:
-		break;
-	}
+	//switch (pInputOrder->VolumeCondition) {
+	//case THOST_FTDC_VC_AV:
+	//	Req.VolumeCondition = TORA_TSTP_VC_AV;
+	//	break;
+	//case THOST_FTDC_VC_MV:
+	//	Req.VolumeCondition = TORA_TSTP_VC_MV;
+	//	break;
+	//case THOST_FTDC_VC_CV:
+	//	Req.VolumeCondition = TORA_TSTP_VC_CV;
+	//	break;
+	//default:
+	//	break;
+	//}
 
-	Req.ForceCloseReason = TORA_TSTP_FCC_NotForceClose;
-	Req.Operway = TORA_TSTP_OPERW_PCClient;
-	strncpy(Req.BusinessUnitID, pInputOrder->InvestUnitID, sizeof(Req.BusinessUnitID) - 1);
+	//Req.ForceCloseReason = TORA_TSTP_FCC_NotForceClose;
+	//Req.Operway = TORA_TSTP_OPERW_PCClient;
+	//strncpy(Req.BusinessUnitID, pInputOrder->InvestUnitID, sizeof(Req.BusinessUnitID) - 1);
 
 	return m_pUserApi->ReqOrderInsert(&Req, nRequestID);
 }
 
-//报单录入应答	
-void CFtdcTraderApiImpl::OnRspOrderInsert(CTORATstpInputOrderField* pInputOrderField, CTORATstpRspInfoField* pRspInfo, int nRequestID)
-{
-	if (m_pSpi)
-	{
-		CThostFtdcRspInfoField* pThostRspInfo = NULL;
-
-		if (pRspInfo)
-		{
-			memset(&ThostRspInfo, 0, sizeof(ThostRspInfo));
-			ThostRspInfo.ErrorID = pRspInfo->ErrorID;
-			strncpy(ThostRspInfo.ErrorMsg, pRspInfo->ErrorMsg, sizeof(ThostRspInfo.ErrorMsg) - 1);
-			pThostRspInfo = &ThostRspInfo;
-		}
-
-		CThostFtdcInputOrderField* pThostInputOrder = NULL;
-		CThostFtdcInputOrderField ThostInputOrder;
-
-		if (pInputOrderField)
-		{
-			memset(&ThostInputOrder, 0x00, sizeof(ThostInputOrder));
-			strncpy(ThostInputOrder.BrokerID, m_BrokerID, sizeof(ThostInputOrder.BrokerID) - 1);
-			strncpy(ThostInputOrder.UserID, m_UserID, sizeof(ThostInputOrder.UserID) - 1);
-			strncpy(ThostInputOrder.InvestorID, pInputOrderField->InvestorID, sizeof(ThostInputOrder.InvestorID) - 1);
-			if (pInputOrderField->ExchangeID == TORA_TSTP_EXD_SSE)
-				strncpy(ThostInputOrder.ExchangeID, EXCHANGE_SH, sizeof(ThostInputOrder.ExchangeID) - 1);
-			else if (pInputOrderField->ExchangeID == TORA_TSTP_EXD_SZSE)
-				strncpy(ThostInputOrder.ExchangeID, EXCHANGE_SZ, sizeof(ThostInputOrder.ExchangeID) - 1);
-			else if (pInputOrderField->ExchangeID == TORA_TSTP_EXD_BSE)
-				strncpy(ThostInputOrder.ExchangeID, EXCHANGE_BSE, sizeof(ThostInputOrder.ExchangeID) - 1);
-			else if (pInputOrderField->ExchangeID == TORA_TSTP_EXD_HK)
-				strncpy(ThostInputOrder.ExchangeID, EXCHANGE_HKEX, sizeof(ThostInputOrder.ExchangeID) - 1);
-			strncpy(ThostInputOrder.InstrumentID, pInputOrderField->SecurityID, sizeof(ThostInputOrder.InstrumentID) - 1);
-			snprintf(ThostInputOrder.OrderRef, sizeof(ThostInputOrder.OrderRef), "%d", pInputOrderField->OrderRef);
-			if (pInputOrderField->OrderPriceType == TORA_TSTP_OPT_LimitPrice)
-				ThostInputOrder.OrderPriceType = THOST_FTDC_OPT_LimitPrice;
-			else
-				ThostInputOrder.OrderPriceType = THOST_FTDC_OPT_AnyPrice;
-			ThostInputOrder.Direction = pInputOrderField->Direction == TORA_TSTP_D_Buy ? THOST_FTDC_D_Buy : THOST_FTDC_D_Sell;
-			ThostInputOrder.CombOffsetFlag[0] = pInputOrderField->Direction == TORA_TSTP_D_Buy ? THOST_FTDC_OF_Open : THOST_FTDC_OF_Close;
-			ThostInputOrder.CombHedgeFlag[0] = THOST_FTDC_HF_Speculation;
-			ThostInputOrder.LimitPrice = pInputOrderField->LimitPrice;
-			ThostInputOrder.VolumeTotalOriginal = pInputOrderField->VolumeTotalOriginal;
-			ThostInputOrder.MinVolume = 0;
-
-			switch (pInputOrderField->TimeCondition) {
-			case TORA_TSTP_TC_IOC:
-				ThostInputOrder.TimeCondition = THOST_FTDC_TC_IOC;
-				break;
-			case TORA_TSTP_TC_GFS:
-				ThostInputOrder.TimeCondition = THOST_FTDC_TC_GFS;
-				break;
-			case TORA_TSTP_TC_GFD:
-				ThostInputOrder.TimeCondition = THOST_FTDC_TC_GFD;
-				break;
-			case TORA_TSTP_TC_GTD:
-				ThostInputOrder.TimeCondition = THOST_FTDC_TC_GTD;
-				break;
-			case TORA_TSTP_TC_GTC:
-				ThostInputOrder.TimeCondition = THOST_FTDC_TC_GTC;
-				break;
-			case TORA_TSTP_TC_GFA:
-				ThostInputOrder.TimeCondition = THOST_FTDC_TC_GFA;
-				break;
-			default:
-				break;
-			}
-			
-			ThostInputOrder.VolumeCondition = THOST_FTDC_VC_AV;
-			ThostInputOrder.ContingentCondition = THOST_FTDC_CC_Immediately;
-			ThostInputOrder.ForceCloseReason = THOST_FTDC_FCC_NotForceClose;
-			ThostInputOrder.IsAutoSuspend = 0;
-			ThostInputOrder.UserForceClose = 0;
-			strncpy(ThostInputOrder.GTDDate, pInputOrderField->GTDate, sizeof(ThostInputOrder.GTDDate) - 1);
-			pThostInputOrder = &ThostInputOrder;
-		}
-		m_pSpi->OnRspOrderInsert(pThostInputOrder, pThostRspInfo, nRequestID, true);
-	}
-}
-
-
 ///报单操作请求
 int CFtdcTraderApiImpl::ReqOrderAction(CThostFtdcInputOrderActionField *pOrderAction, int nRequestID)
 {
-	CTORATstpInputOrderActionField Req;
-	memset(&Req, 0, sizeof(Req));
-	Req.OrderRef = atol(pOrderAction->OrderRef);
-	Req.OrderActionRef = pOrderAction->OrderActionRef;
-	Req.FrontID = pOrderAction->FrontID;
-	Req.SessionID = pOrderAction->SessionID;
-	strncpy(Req.OrderSysID, pOrderAction->OrderSysID, sizeof(Req.OrderSysID) - 1);
-	if (strcmp(pOrderAction->ExchangeID, EXCHANGE_SH) == 0) {
-		Req.ExchangeID = TORA_TSTP_EXD_SSE;
-	}
-	else if (strcmp(pOrderAction->ExchangeID, EXCHANGE_SZ) == 0) {
-		Req.ExchangeID = TORA_TSTP_EXD_SZSE;
-	}
-	else if (strcmp(pOrderAction->ExchangeID, EXCHANGE_BSE) == 0) {
-		Req.ExchangeID = TORA_TSTP_EXD_BSE;
-	}
-	else if (strlen(pOrderAction->ExchangeID) > 0) {
-		Req.ExchangeID = TORA_TSTP_EXD_HK;
-	}
-	Req.ActionFlag = pOrderAction->ActionFlag == THOST_FTDC_AF_Delete ? TORA_TSTP_AF_Delete : TORA_TSTP_AF_Modify;
-	Req.Operway = TORA_TSTP_OPERW_PCClient;
+    CUTInputOrderActionField Req = {0};
+	//Req.OrderRef = atol(pOrderAction->OrderRef);
+	//Req.OrderActionRef = pOrderAction->OrderActionRef;
+	//Req.FrontID = pOrderAction->FrontID;
+	//Req.SessionID = pOrderAction->SessionID;
+	//strncpy(Req.OrderSysID, pOrderAction->OrderSysID, sizeof(Req.OrderSysID) - 1);
+	//if (strcmp(pOrderAction->ExchangeID, EXCHANGE_SH) == 0) {
+	//	Req.ExchangeID = TORA_TSTP_EXD_SSE;
+	//}
+	//else if (strcmp(pOrderAction->ExchangeID, EXCHANGE_SZ) == 0) {
+	//	Req.ExchangeID = TORA_TSTP_EXD_SZSE;
+	//}
+	//else if (strcmp(pOrderAction->ExchangeID, EXCHANGE_BSE) == 0) {
+	//	Req.ExchangeID = TORA_TSTP_EXD_BSE;
+	//}
+	//else if (strlen(pOrderAction->ExchangeID) > 0) {
+	//	Req.ExchangeID = TORA_TSTP_EXD_HK;
+	//}
+	//Req.ActionFlag = pOrderAction->ActionFlag == THOST_FTDC_AF_Delete ? TORA_TSTP_AF_Delete : TORA_TSTP_AF_Modify;
+	//Req.Operway = TORA_TSTP_OPERW_PCClient;
 
 	return m_pUserApi->ReqOrderAction(&Req, nRequestID);
 }
 
-//撤单应答	
-void CFtdcTraderApiImpl::OnRspOrderAction(CTORATstpInputOrderActionField* pInputOrderActionField, CTORATstpRspInfoField* pRspInfo, int nRequestID)
-{
-	if (m_pSpi)
-	{
-
-		CThostFtdcRspInfoField* pThostRspInfo = NULL;
-
-		if (pRspInfo)
-		{
-			memset(&ThostRspInfo, 0, sizeof(ThostRspInfo));
-			ThostRspInfo.ErrorID = pRspInfo->ErrorID;
-			strncpy(ThostRspInfo.ErrorMsg, pRspInfo->ErrorMsg, sizeof(ThostRspInfo.ErrorMsg) - 1);
-			pThostRspInfo = &ThostRspInfo;
-		}
-
-		CThostFtdcInputOrderActionField* pThostOrderAction = NULL;
-		CThostFtdcInputOrderActionField  ThostOrderAction;
-		if (pInputOrderActionField)
-		{
-			memset(&ThostOrderAction, 0, sizeof(ThostOrderAction));
-			if (pInputOrderActionField->ExchangeID == TORA_TSTP_EXD_SSE)
-				strncpy(ThostOrderAction.ExchangeID, EXCHANGE_SH, sizeof(ThostOrderAction.ExchangeID) - 1);
-			else if (pInputOrderActionField->ExchangeID == TORA_TSTP_EXD_SZSE)
-				strncpy(ThostOrderAction.ExchangeID, EXCHANGE_SZ, sizeof(ThostOrderAction.ExchangeID) - 1);
-			else if (pInputOrderActionField->ExchangeID == TORA_TSTP_EXD_BSE)
-				strncpy(ThostOrderAction.ExchangeID, EXCHANGE_BSE, sizeof(ThostOrderAction.ExchangeID) - 1);
-			else if (pInputOrderActionField->ExchangeID == TORA_TSTP_EXD_HK)
-				strncpy(ThostOrderAction.ExchangeID, EXCHANGE_HKEX, sizeof(ThostOrderAction.ExchangeID) - 1);
-			strncpy(ThostOrderAction.OrderSysID, pInputOrderActionField->OrderSysID, sizeof(ThostOrderAction.OrderSysID) - 1);
-			strncpy(ThostOrderAction.BrokerID, m_BrokerID, sizeof(ThostOrderAction.BrokerID) - 1);
-			strncpy(ThostOrderAction.UserID, m_UserID, sizeof(ThostOrderAction.UserID) - 1);
-			ThostOrderAction.SessionID = pInputOrderActionField->SessionID;
-			ThostOrderAction.FrontID = pInputOrderActionField->FrontID;
-			snprintf(ThostOrderAction.OrderRef, sizeof(ThostOrderAction.OrderRef),"%d",pInputOrderActionField->OrderRef);
-			ThostOrderAction.OrderActionRef = pInputOrderActionField->OrderActionRef;
-			ThostOrderAction.ActionFlag = pInputOrderActionField->ActionFlag == TORA_TSTP_AF_Modify ? THOST_FTDC_AF_Modify : THOST_FTDC_AF_Delete;
-			pThostOrderAction = &ThostOrderAction;
-		}
-
-		m_pSpi->OnRspOrderAction(pThostOrderAction, pThostRspInfo, nRequestID, true);
-	}
-}
-
-
-///报单查询请求
 int CFtdcTraderApiImpl::ReqQryOrder(CThostFtdcQryOrderField *pQryOrder, int nRequestID)
 {
-	CTORATstpQryOrderField Req;
-	memset(&Req, 0, sizeof(Req));
-
+    CUTQryOrderField Req = {0};
 	if (strcmp(pQryOrder->ExchangeID, EXCHANGE_SH) == 0) {
-		Req.ExchangeID = TORA_TSTP_EXD_SSE;
+		Req.ExchangeID = UT_EXG_SSE;
 	}
 	else if (strcmp(pQryOrder->ExchangeID, EXCHANGE_SZ) == 0) {
-		Req.ExchangeID = TORA_TSTP_EXD_SZSE;
+		Req.ExchangeID = UT_EXG_SZSE;
 	}
 	else if (strlen(pQryOrder->ExchangeID) > 0) {
-		Req.ExchangeID = TORA_TSTP_EXD_HK;
+		Req.ExchangeID = UT_EXG_HKEX;
 	}
-	strncpy(Req.SecurityID, pQryOrder->InstrumentID, sizeof(Req.SecurityID) - 1);
-
+	strncpy(Req.InstrumentID, pQryOrder->InstrumentID, sizeof(Req.InstrumentID)-1);
 	return m_pUserApi->ReqQryOrder(&Req, nRequestID);
 }
 
-///成交单查询请求
 int CFtdcTraderApiImpl::ReqQryTrade(CThostFtdcQryTradeField *pQryTrade, int nRequestID)
 {
     CUTQryTradeField Req = {0};
-	memset(&Req, 0, sizeof(Req));
-
-	//if (strcmp(pQryTrade->ExchangeID, EXCHANGE_SH) == 0) {
-	//	Req.ExchangeID = TORA_TSTP_EXD_SSE;
-	//}
-	//else if (strcmp(pQryTrade->ExchangeID, EXCHANGE_SZ) == 0) {
-	//	Req.ExchangeID = TORA_TSTP_EXD_SZSE;
-	//}
-	//else if (strlen(pQryTrade->ExchangeID) > 0) {
-	//	Req.ExchangeID = TORA_TSTP_EXD_HK;
-	//}
-	//strncpy(Req.SecurityID, pQryTrade->InstrumentID, sizeof(Req.SecurityID) - 1);
-
+	if (strcmp(pQryTrade->ExchangeID, EXCHANGE_SH) == 0) {
+        Req.ExchangeID = UT_EXG_SSE;
+	}
+	else if (strcmp(pQryTrade->ExchangeID, EXCHANGE_SZ) == 0) {
+        Req.ExchangeID = UT_EXG_SZSE;
+	}
+	else if (strlen(pQryTrade->ExchangeID) > 0) {
+        Req.ExchangeID = UT_EXG_HKEX;
+	}
+	strncpy(Req.InstrumentID, pQryTrade->InstrumentID, sizeof(Req.InstrumentID)-1);
 	return m_pUserApi->ReqQryTrade(&Req, nRequestID);
 }
 
-///可用投资者账户查询请求
 int CFtdcTraderApiImpl::ReqQryInvestor(CThostFtdcQryInvestorField *pQryInvestor, int nRequestID)
 {
     CUTQryInvestorField Req = {0};
-	memset(&Req, 0, sizeof(Req));
 	strncpy(Req.InvestorID, pQryInvestor->InvestorID, sizeof(Req.InvestorID) - 1);
-
 	return m_pUserApi->ReqQryInvestor(&Req, nRequestID);
 }
 
-///投资者资金账户查询请求
 int CFtdcTraderApiImpl::ReqQryTradingAccount(CThostFtdcQryTradingAccountField *pQryTradingAccount, int nRequestID)
 {
     CUTQryTradingAccountField Req = {0};
-	memset(&Req, 0, sizeof(Req));
 	strncpy(Req.InvestorID, pQryTradingAccount->InvestorID, sizeof(Req.InvestorID) - 1);
-
 	return m_pUserApi->ReqQryTradingAccount(&Req, nRequestID);
 }
 
-//资金账户查询
-void CFtdcTraderApiImpl::OnRspQryTradingAccount(CUTTradingAccountField* pTradingAccount, CUTRspInfoField* pRspInfo, int nRequestID, bool bIsLast)
+void CFtdcTraderApiImpl::OnRspQryTradingAccount(CUTTradingAccountField *pTradingAccount, CUTRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
 {
-	//if (m_pSpi)
-	//{
-	//	CThostFtdcTradingAccountField* pCTPTradingAccount = NULL;
-	//	CThostFtdcTradingAccountField CTPTradingAccount;
-	//	if (pTradingAccount)
-	//	{
-	//		memset(&CTPTradingAccount, 0, sizeof(CTPTradingAccount));
-	//		strncpy(CTPTradingAccount.BrokerID, m_BrokerID, sizeof(CTPTradingAccount.BrokerID) - 1);
-	//		strncpy(CTPTradingAccount.AccountID, pTradingAccount->AccountID, sizeof(CTPTradingAccount.AccountID) - 1);
-	//		CTPTradingAccount.PreBalance = pTradingAccount->PreDeposit;
-	//		CTPTradingAccount.Available = pTradingAccount->UsefulMoney;
-	//		CTPTradingAccount.Withdraw = pTradingAccount->Withdraw;
-	//		CTPTradingAccount.Deposit = pTradingAccount->Deposit;
-	//		if(pTradingAccount->CurrencyID == TORA_TSTP_CID_CNY)
-	//			strcpy(CTPTradingAccount.CurrencyID, "CNY");
-	//		else if (pTradingAccount->CurrencyID == TORA_TSTP_CID_HKD)
-	//			strcpy(CTPTradingAccount.CurrencyID, "HKD");
-	//		else if (pTradingAccount->CurrencyID == TORA_TSTP_CID_USD)
-	//			strcpy(CTPTradingAccount.CurrencyID, "USD");
+    CThostFtdcTradingAccountField* pCTPTradingAccount = nullptr;
+    CThostFtdcRspInfoField* pCTPRspInfo = nullptr;
 
-	//		CTPTradingAccount.FrozenCash = pTradingAccount->FrozenCash;
-	//		CTPTradingAccount.FrozenCommission = pTradingAccount->FrozenCommission;
-	//		CTPTradingAccount.WithdrawQuota = pTradingAccount->FetchLimit;
-	//		pCTPTradingAccount = &CTPTradingAccount;
-	//	}
-	//	CThostFtdcRspInfoField* pThostRspInfo = NULL;
-	//	CThostFtdcRspInfoField  ThostRspInfo;
-	//	if (NULL != pRspInfo)
-	//	{
-	//		memset(&ThostRspInfo, 0, sizeof(ThostRspInfo));
-	//		ThostRspInfo.ErrorID = pRspInfo->ErrorID;
-	//		strncpy(ThostRspInfo.ErrorMsg, pRspInfo->ErrorMsg, sizeof(ThostRspInfo.ErrorMsg) - 1);
-	//		pThostRspInfo = &ThostRspInfo;
-	//	}
+    if (m_pSpi) {
+        CThostFtdcTradingAccountField CTPTradingAccount = {0};
+        CThostFtdcRspInfoField CTPRspInfo = {0};
+        if (pTradingAccount) {
+            strncpy(CTPTradingAccount.BrokerID, m_BrokerID, sizeof(CTPTradingAccount.BrokerID) - 1);
+            strncpy(CTPTradingAccount.AccountID, pTradingAccount->AccountID, sizeof(CTPTradingAccount.AccountID) - 1);
+            CTPTradingAccount.PreBalance = pTradingAccount->PreDeposit;
+            CTPTradingAccount.Available = pTradingAccount->Available;
+            CTPTradingAccount.Withdraw = pTradingAccount->Withdraw;
+            CTPTradingAccount.Deposit = pTradingAccount->Deposit;
+            strcpy(CTPTradingAccount.CurrencyID, pTradingAccount->CurrencyID);
+            //strcpy(CTPTradingAccount.CurrencyID, "CNY");
+            CTPTradingAccount.FrozenCash = pTradingAccount->FrozenCash;
+            CTPTradingAccount.FrozenCommission = pTradingAccount->FrozenCommission;
+            CTPTradingAccount.WithdrawQuota = pTradingAccount->WithdrawQuota;
+            pCTPTradingAccount = &CTPTradingAccount;
+        }
 
-	//	m_pSpi->OnRspQryTradingAccount(pCTPTradingAccount, pThostRspInfo, nRequestID, bIsLast);
-	//}
+        if (pRspInfo) {
+            CTPRspInfo.ErrorID = pRspInfo->ErrorID;
+            strncpy(CTPRspInfo.ErrorMsg, pRspInfo->ErrorMsg, sizeof(CTPRspInfo.ErrorMsg)-1);
+            pCTPRspInfo = &CTPRspInfo;
+        }
+    }
+    m_pSpi->OnRspQryTradingAccount(pCTPTradingAccount, pCTPRspInfo, nRequestID, bIsLast);
 }
+
+
 
 //查询股东账户
 //void CFtdcTraderApiImpl::OnRspQryShareholderAccount(CTORATstpShareholderAccountField* pShareholderAccount, CTORATstpRspInfoField* pRspInfo, int nRequestID, bool bIsLast)
@@ -537,54 +423,129 @@ void CFtdcTraderApiImpl::OnRspQryTradingAccount(CUTTradingAccountField* pTrading
 //	else if (pShareholderAccount && pShareholderAccount->ExchangeID == TORA_TSTP_EXD_HK)
 //		strncpy(m_ShareholderID_HKEX, pShareholderAccount->ShareholderID, sizeof(m_ShareholderID_HKEX) - 1);
 //}
-//
 
-///合约查询请求
 int CFtdcTraderApiImpl::ReqQryInstrument(CThostFtdcQryInstrumentField *pQryInstrument, int nRequestID)
 {
     CUTQryInstrumentField Req = {0};
-	memset(&Req,0,sizeof(Req));
 
-	//if (strcmp(pQryInstrument->ExchangeID, EXCHANGE_SH) == 0) {
-	//	Req.ExchangeID = TORA_TSTP_EXD_SSE;
-	//}
-	//else if (strcmp(pQryInstrument->ExchangeID, EXCHANGE_SZ) == 0) {
-	//	Req.ExchangeID = TORA_TSTP_EXD_SZSE;
-	//}
+	if (strcmp(pQryInstrument->ExchangeID, EXCHANGE_SH) == 0) {
+		Req.ExchangeID = UT_EXG_SSE;
+	}
+	else if (strcmp(pQryInstrument->ExchangeID, EXCHANGE_SZ) == 0) {
+		Req.ExchangeID = UT_EXG_SZSE;
+	}
 	//else if (strcmp(pQryInstrument->ExchangeID, EXCHANGE_BSE) == 0) {
 	//	Req.ExchangeID = TORA_TSTP_EXD_BSE;
 	//}
-	//else if (strcmp(pQryInstrument->ExchangeID, EXCHANGE_HKEX) == 0) {
-	//	Req.ExchangeID = TORA_TSTP_EXD_HK;
-	//}
-	//
-	//strncpy(Req.SecurityID, pQryInstrument->InstrumentID, sizeof(Req.SecurityID) - 1);
-	//Req.ProductID = pQryInstrument->ProductID[0];
-
+	else if (strcmp(pQryInstrument->ExchangeID, EXCHANGE_HKEX) == 0) {
+		Req.ExchangeID = UT_EXG_HKEX;
+	}
+	strncpy(Req.InstrumentID, pQryInstrument->InstrumentID, sizeof(Req.InstrumentID)-1);
 	return m_pUserApi->ReqQryInstrument(&Req, nRequestID);
 }
 
-///交易所查询请求
-int CFtdcTraderApiImpl::ReqQryExchange(CThostFtdcQryExchangeField *pQryExchange, int nRequestID)
+void CFtdcTraderApiImpl::OnRspQryInstrument(CUTInstrumentField *pInstrument, CUTRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
 {
-	//CTORATstpQryExchangeField Req;
-	//memset(&Req, 0, sizeof(Req));
+    CThostFtdcInstrumentField* pCTPInstrument = nullptr;
+    CThostFtdcRspInfoField* pCTPRspInfo = nullptr;
 
-	//if (strcmp(pQryExchange->ExchangeID, EXCHANGE_SH) == 0) {
-	//	Req.ExchangeID = TORA_TSTP_EXD_SSE;
-	//}
-	//else if (strcmp(pQryExchange->ExchangeID, EXCHANGE_SZ) == 0) {
-	//	Req.ExchangeID = TORA_TSTP_EXD_SZSE;
-	//}
-	//else if (strcmp(pQryExchange->ExchangeID, EXCHANGE_BSE) == 0) {
-	//	Req.ExchangeID = TORA_TSTP_EXD_BSE;
-	//}
-	//else if (strcmp(pQryExchange->ExchangeID, EXCHANGE_HKEX) == 0) {
-	//	Req.ExchangeID = TORA_TSTP_EXD_HK;
-	//}
-
-	//return m_pUserApi->ReqQryExchange(&Req, nRequestID);
+    if (m_pSpi) {
+        CThostFtdcInstrumentField CTPInstrument = {0};
+        CThostFtdcRspInfoField CTPRspInfo = {0};
+        if (pInstrument) {
+        	if (pInstrument->ExchangeID == UT_EXG_SSE) {
+                strncpy(CTPInstrument.ExchangeID, EXCHANGE_SH, sizeof(CTPInstrument.ExchangeID)-1);
+            }
+        	else if (pInstrument->ExchangeID == UT_EXG_SZSE) {
+                strncpy(CTPInstrument.ExchangeID, EXCHANGE_SZ, sizeof(CTPInstrument.ExchangeID)-1);
+            }
+        	//else if (pInstrument->ExchangeID == TORA_TSTP_EXD_BSE) {
+            //    strncpy(CTPInstrument.ExchangeID, EXCHANGE_BSE, sizeof(CTPInstrument.ExchangeID) - 1);
+            //}
+        	else if (pInstrument->ExchangeID == UT_EXG_HKEX) {
+                strncpy(CTPInstrument.ExchangeID, EXCHANGE_HKEX, sizeof(CTPInstrument.ExchangeID)-1);
+            }
+        	strncpy(CTPInstrument.InstrumentID,pInstrument->InstrumentID,sizeof(CTPInstrument.InstrumentID)-1);
+        	//strncpy(CTPInstrument.ExchangeInstID,pInstrument->Ins,sizeof(CTPInstrument.ExchangeInstID)-1);
+        	strncpy(CTPInstrument.InstrumentName,pInstrument->InstrumentName,sizeof(CTPInstrument.InstrumentName)-1);
+            strncpy(CTPInstrument.ProductID, pInstrument->ProductID, sizeof(CTPInstrument.ProductID));
+        	CTPInstrument.VolumeMultiple = pInstrument->VolumeMultiple;
+        	CTPInstrument.PriceTick = pInstrument->PriceTick;
+        	CTPInstrument.IsTrading = true;
+        	CTPInstrument.PositionType = THOST_FTDC_PT_Net;
+        	CTPInstrument.PositionDateType = THOST_FTDC_PDT_UseHistory;
+        	CTPInstrument.OptionsType = THOST_FTDC_CP_CallOptions;
+        	//strncpy(CTPInstrument.OpenDate, pInstrument->OpenDate, sizeof(CTPInstrument.OpenDate) - 1);
+        	//strncpy(CTPInstrument.CreateDate, pInstrument->OpenDate, sizeof(CTPInstrument.CreateDate) - 1);
+        	//// 类型
+        	//switch (pInstrument->ProductID) {
+        	//case TORA_TSTP_PID_SHStock: // 上海股票
+        	//case TORA_TSTP_PID_SZStock: // 深圳股票
+        	//case TORA_TSTP_PID_SZSEHKMain: // 深港通港股主板
+        	//case TORA_TSTP_PID_SHKC: // 上海科创板
+        	//case TORA_TSTP_PID_SZSEHKNasdaqAMX: // 深港通港股NasdaqAMX市场
+        	//case TORA_TSTP_PID_SZSEHKGEM: // 深港通港股创业板
+        	//case TORA_TSTP_PID_SZSEHKETS: // 深港通港股扩充交易证券
+        	//	CTPInstrument.ProductClass = OPENCTP_FTDC_PC_EQUITY;
+        	//	break;
+        	//case TORA_TSTP_PID_SHBond: // 上海债券
+        	//case TORA_TSTP_PID_SHStandard: // 上海标准券
+        	//case TORA_TSTP_PID_SHRepurchase: // 上海质押式回购
+        	//case TORA_TSTP_PID_SZBond: // 深圳债券
+        	//case TORA_TSTP_PID_SZStandard: // 深圳标准券
+        	//case TORA_TSTP_PID_SZRepurchase: // 深圳质押式回购
+        	//	CTPInstrument.ProductClass = OPENCTP_FTDC_PC_BOND; // 债券
+        	//	break;
+        	//case TORA_TSTP_PID_SHFund: // 上海基金
+        	//case TORA_TSTP_PID_SZFund: // 深圳基金
+        	//	CTPInstrument.ProductClass = OPENCTP_FTDC_PC_FUND; // 基金
+        	//	break;
+        	//default:
+        	//	CTPInstrument.ProductClass = OPENCTP_FTDC_PC_EQUITY;
+        	//	break;
+        	//}
+        	CTPInstrument.InstLifePhase = THOST_FTDC_IP_Started;
+        	CTPInstrument.MaxMarginSideAlgorithm=THOST_FTDC_MMSA_NO;
+        	CTPInstrument.CombinationType = THOST_FTDC_COMBT_Future;
+        	CTPInstrument.LongMarginRatio = 1.0;
+        	CTPInstrument.ShortMarginRatio = 1.0;
+        	//strcpy(CTPInstrument.OpenDate, pInstrument->OpenDate);
+        	CTPInstrument.MaxLimitOrderVolume = pInstrument->MaxLimitOrderVolume;
+        	CTPInstrument.MinLimitOrderVolume = pInstrument->MinLimitOrderVolume;
+        	CTPInstrument.MaxMarketOrderVolume = pInstrument->MaxMarketOrderVolume;
+        	CTPInstrument.MinMarketOrderVolume = pInstrument->MinMarketOrderVolume;
+        	pCTPInstrument = &CTPInstrument;
+        }
+        if (pRspInfo) {
+            CTPRspInfo.ErrorID = pRspInfo->ErrorID;
+            strncpy(CTPRspInfo.ErrorMsg,pRspInfo->ErrorMsg,sizeof(CTPRspInfo.ErrorMsg)-1);
+            pCTPRspInfo = &ThostRspInfo;
+        }
+    }
+    m_pSpi->OnRspQryInstrument(pCTPInstrument, pCTPRspInfo, nRequestID, bIsLast);
 }
+
+///交易所查询请求
+//int CFtdcTraderApiImpl::ReqQryExchange(CThostFtdcQryExchangeField *pQryExchange, int nRequestID)
+//{
+//	CTORATstpQryExchangeField Req;
+//	memset(&Req, 0, sizeof(Req));
+//
+//	if (strcmp(pQryExchange->ExchangeID, EXCHANGE_SH) == 0) {
+//		Req.ExchangeID = TORA_TSTP_EXD_SSE;
+//	}
+//	else if (strcmp(pQryExchange->ExchangeID, EXCHANGE_SZ) == 0) {
+//		Req.ExchangeID = TORA_TSTP_EXD_SZSE;
+//	}
+//	else if (strcmp(pQryExchange->ExchangeID, EXCHANGE_BSE) == 0) {
+//		Req.ExchangeID = TORA_TSTP_EXD_BSE;
+//	}
+//	else if (strcmp(pQryExchange->ExchangeID, EXCHANGE_HKEX) == 0) {
+//		Req.ExchangeID = TORA_TSTP_EXD_HK;
+//	}
+//
+//	return m_pUserApi->ReqQryExchange(&Req, nRequestID);
+//}
 
 //查询交易所
 //void CFtdcTraderApiImpl::OnRspQryExchange(CTORATstpExchangeField* pExchange, CTORATstpRspInfoField* pRspInfo, int nRequestID, bool bIsLast)
@@ -621,42 +582,96 @@ int CFtdcTraderApiImpl::ReqQryExchange(CThostFtdcQryExchangeField *pQryExchange,
 //	}
 //}
 
-///投资者持仓查询请求
 int CFtdcTraderApiImpl::ReqQryInvestorPosition(CThostFtdcQryInvestorPositionField *pQryInvestorPosition, int nRequestID)
 {
     CUTQryInvestorPositionField Req = {0};
-	
-//	memset(&Req, 0, sizeof(Req));
-//	strncpy(Req.InvestorID, m_UserID, sizeof(Req.InvestorID) - 1);
-//	if (strcmp(pQryInvestorPosition->ExchangeID, EXCHANGE_SH) == 0)
-//		Req.ExchangeID = TORA_TSTP_EXD_SSE;
-//	else if (strcmp(pQryInvestorPosition->ExchangeID, EXCHANGE_SZ) == 0)
-//		Req.ExchangeID = TORA_TSTP_EXD_SZSE;
-//	else if (strcmp(pQryInvestorPosition->ExchangeID, EXCHANGE_BSE) == 0)
-//		Req.ExchangeID = TORA_TSTP_EXD_BSE;
-//	else if (strcmp(pQryInvestorPosition->ExchangeID, EXCHANGE_HKEX) == 0)
-//		Req.ExchangeID = TORA_TSTP_EXD_HK;
-//	strncpy(Req.SecurityID, pQryInvestorPosition->InstrumentID, sizeof(Req.SecurityID) - 1);
-//
+	strncpy(Req.InvestorID, m_UserID, sizeof(Req.InvestorID)-1);
+	if (strcmp(pQryInvestorPosition->ExchangeID, EXCHANGE_SH) == 0) {
+        Req.ExchangeID = UT_EXG_SSE;
+    }
+	else if (strcmp(pQryInvestorPosition->ExchangeID, EXCHANGE_SZ) == 0) {
+        Req.ExchangeID = UT_EXG_SZSE;
+    }
+	//else if (strcmp(pQryInvestorPosition->ExchangeID, EXCHANGE_BSE) == 0) {
+    //    Req.ExchangeID = TORA_TSTP_EXD_BSE;
+    //}
+	else if (strcmp(pQryInvestorPosition->ExchangeID, EXCHANGE_HKEX) == 0) {
+        Req.ExchangeID = UT_EXG_HKEX;
+    }
+	strncpy(Req.InstrumentID, pQryInvestorPosition->InstrumentID, sizeof(Req.InstrumentID)-1);
 	return m_pUserApi->ReqQryInvestorPosition(&Req, nRequestID);
 }
 
-///投资者手续费率查询请求
+void CFtdcTraderApiImpl::OnRspQryInvestorPosition(CUTInvestorPositionField *pInvestorPosition, CUTRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
+{
+    CThostFtdcInvestorPositionField* pCTPInvestorPosition = nullptr;
+    CThostFtdcRspInfoField* pCTPRspInfo = nullptr;
+
+    if (m_pSpi) {
+        CThostFtdcInvestorPositionField CTPInvestorPosition = {0};
+        CThostFtdcRspInfoField CTPRspInfo = {0};
+        if (pInvestorPosition) {
+        	strncpy(CTPInvestorPosition.BrokerID, m_BrokerID, sizeof(CTPInvestorPosition.BrokerID) - 1);
+        	strncpy(CTPInvestorPosition.InvestorID, m_UserID, sizeof(CTPInvestorPosition.InvestorID) - 1);
+        	if(pInvestorPosition->ExchangeID== TORA_TSTP_EXD_SSE)
+        		strncpy(CTPInvestorPosition.ExchangeID, EXCHANGE_SH, sizeof(CTPInvestorPosition.ExchangeID) - 1);
+        	else if(pInvestorPosition->ExchangeID== TORA_TSTP_EXD_SZSE)
+        		strncpy(CTPInvestorPosition.ExchangeID, EXCHANGE_SZ, sizeof(CTPInvestorPosition.ExchangeID) - 1);
+        	else if (pInvestorPosition->ExchangeID == TORA_TSTP_EXD_BSE)
+        		strncpy(CTPInvestorPosition.ExchangeID, EXCHANGE_BSE, sizeof(CTPInvestorPosition.ExchangeID) - 1);
+        	else if (pInvestorPosition->ExchangeID == TORA_TSTP_EXD_HK)
+        		strncpy(CTPInvestorPosition.ExchangeID, EXCHANGE_HKEX, sizeof(CTPInvestorPosition.ExchangeID) - 1);
+
+        	strncpy(CTPInvestorPosition.InstrumentID, pInvestorPosition->SecurityID, sizeof(CTPInvestorPosition.InstrumentID) - 1);
+        	strncpy(CTPInvestorPosition.TradingDay, TradingDay, sizeof(CTPInvestorPosition.TradingDay) - 1);
+        	CTPInvestorPosition.HedgeFlag = THOST_FTDC_HF_Speculation;
+        	CTPInvestorPosition.UseMargin = 0;
+        	CTPInvestorPosition.FrozenMargin = 0;
+
+        	//上海期货交易所的持仓有两条，分为昨持仓和今持仓
+        	CTPInvestorPosition.PosiDirection = THOST_FTDC_PD_Long; // A股只有多仓
+        	CTPInvestorPosition.Position = pInvestorPosition->CurrentPosition;
+        	CTPInvestorPosition.PositionCost = pInvestorPosition->TotalPosCost;
+        	CTPInvestorPosition.YdPosition = pInvestorPosition->PrePosition;
+        	CTPInvestorPosition.LongFrozen = 0;
+        	CTPInvestorPosition.ShortFrozen = pInvestorPosition->HistoryPosFrozen;
+        	CTPInvestorPosition.PositionDate = THOST_FTDC_PSD_Today;
+        	CTPInvestorPosition.OpenVolume = 0;
+        	CTPInvestorPosition.CloseVolume = 0;
+        	CTPInvestorPosition.OpenCost = pInvestorPosition->OpenPosCost;
+        	CTPInvestorPosition.PositionProfit = 0;
+        	CTPInvestorPosition.CloseProfit = 0;
+        	CTPInvestorPosition.TodayPosition = pInvestorPosition->CurrentPosition - pInvestorPosition->HistoryPos;
+        	m_pSpi->OnRspQryInvestorPosition(&CTPInvestorPosition, pThostRspInfo, nRequestID, bIsLast);
+        }
+
+        if (pRspInfo) {
+            CTPRspInfo.ErrorID = pRspInfo->ErrorID;
+            strncpy(CTPRspInfo.ErrorMsg, pRspInfo->ErrorMsg, sizeof(CTPRspInfo.ErrorMsg)-1);
+            pCTPRspInfo = &ThostRspInfo;
+        }
+    }
+    m_pSpi->OnRspQryInvestorPosition(pCTPInvestorPosition, pCTPRspInfo, nRequestID, bIsLast);
+}
+
+
 int CFtdcTraderApiImpl::ReqQryInstrumentCommissionRate(CThostFtdcQryInstrumentCommissionRateField *pQryInstrumentCommissionRate, int nRequestID)
 {
     CUTQryInstrumentCommissionRateField Req = {0};
-
-	//strncpy(Req.DepartmentID, m_BrokerID, sizeof(Req.DepartmentID) - 1);
-	//strncpy(Req.InvestorID, pQryInstrumentCommissionRate->InvestorID, sizeof(Req.InvestorID) - 1);
-	//if (strcmp(pQryInstrumentCommissionRate->ExchangeID, EXCHANGE_SH) == 0)
-	//	Req.ExchangeID = TORA_TSTP_EXD_SSE;
-	//else if (strcmp(pQryInstrumentCommissionRate->ExchangeID, EXCHANGE_SZ) == 0)
-	//	Req.ExchangeID = TORA_TSTP_EXD_SZSE;
-	//else if (strcmp(pQryInstrumentCommissionRate->ExchangeID, EXCHANGE_BSE) == 0)
-	//	Req.ExchangeID = TORA_TSTP_EXD_BSE;
-	//else if (strcmp(pQryInstrumentCommissionRate->ExchangeID, EXCHANGE_HKEX) == 0)
-	//	Req.ExchangeID = TORA_TSTP_EXD_HK;
-
+    strncpy(Req.InvestorID, pQryInstrumentCommissionRate->InvestorID, sizeof(Req.InvestorID)-1);
+	strncpy(Req.InstrumentID, pQryInstrumentCommissionRate->InstrumentID, sizeof(Req.InstrumentID)-1);
+	if (strcmp(pQryInstrumentCommissionRate->ExchangeID, EXCHANGE_SH) == 0) {
+        Req.ExchangeID = UT_EXG_SSE;
+    }
+	else if (strcmp(pQryInstrumentCommissionRate->ExchangeID, EXCHANGE_SZ) == 0) {
+        Req.ExchangeID = UT_EXG_SZSE;
+    }
+	//else if (strcmp(pQryInstrumentCommissionRate->ExchangeID, EXCHANGE_BSE) == 0) {
+    //    Req.ExchangeID = TORA_TSTP_EXD_BSE;
+    //}
+	else if (strcmp(pQryInstrumentCommissionRate->ExchangeID, EXCHANGE_HKEX) == 0) {
+        Req.ExchangeID = UT_EXG_HKEX;
+    }
 	return m_pUserApi->ReqQryInstrumentCommissionRate(&Req, nRequestID);
 }
 
@@ -710,10 +725,10 @@ int CFtdcTraderApiImpl::ReqQryProduct(CThostFtdcQryProductField *pQryProduct, in
 
 int CFtdcTraderApiImpl::HandleReqQryProduct(CThostFtdcQryProductField QryProduct, int nRequestID)
 {
-	static CThostFtdcProductField Products[16];
-	memset(Products, 0x00, sizeof(Products));
+	//static CThostFtdcProductField Products[16];
+	//memset(Products, 0x00, sizeof(Products));
 
-	int i = 0;
+	//int i = 0;
 	//strncpy(Products[i].ExchangeID, EXCHANGE_SH, sizeof(Products[i].ExchangeID) - 1);
 	//Products[i].ProductClass = OPENCTP_FTDC_PC_EQUITY;
 	//Products[i].ProductID[0] = TORA_TSTP_PID_SHStock;
@@ -961,62 +976,142 @@ int CFtdcTraderApiImpl::ReqQryTradingNotice(CThostFtdcQryTradingNoticeField *pQr
 	return 0;
 }
 
+/***************Spi****************/
 void CFtdcTraderApiImpl::OnFrontConnected()
 {
-	if(m_pSpi)
-		m_pSpi->OnFrontConnected();
+	if (m_pSpi) m_pSpi->OnFrontConnected();
 }
 
 void CFtdcTraderApiImpl::OnFrontDisconnected(int nReason)
 {
-	if(m_pSpi)
-		m_pSpi->OnFrontDisconnected(0);
+	if (m_pSpi) m_pSpi->OnFrontDisconnected(nReason);
 }
-		
 
-///用户登录应答
-void CFtdcTraderApiImpl::OnRspLogin(CUTRspLoginField *pRspUserLoginField, CUTRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
+//报单录入应答
+void CFtdcTraderApiImpl::OnRspOrderInsert(CUTInputOrderField *pInputOrder, CUTRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
 {
-	if(m_pSpi)
-	{
-		CThostFtdcRspUserLoginField*  pThostRspUserLogin=NULL;
-					
-		if(pRspUserLoginField)
-		{
-			memset(&ThostRspUserLogin,0,sizeof(ThostRspUserLogin));
-			strncpy(ThostRspUserLogin.TradingDay, TradingDay, sizeof(ThostRspUserLogin.TradingDay)-1);
-			//strncpy(ThostRspUserLogin.BrokerID,pRspUserLoginField->DepartmentID, sizeof(ThostRspUserLogin.BrokerID) - 1);
-			strncpy(ThostRspUserLogin.UserID,m_UserID, sizeof(ThostRspUserLogin.UserID) - 1);
-			ThostRspUserLogin.FrontID = pRspUserLoginField->FrontID;
-			ThostRspUserLogin.SessionID=pRspUserLoginField->SessionID;
-			snprintf(ThostRspUserLogin.MaxOrderRef, sizeof(ThostRspUserLogin.MaxOrderRef), "%d", pRspUserLoginField->MaxOrderRef+1);
-			//strncpy(ThostRspUserLogin.TradingDay, pRspUserLoginField->TradingDay, sizeof(ThostRspUserLogin.TradingDay) - 1);
-			strncpy(ThostRspUserLogin.SystemName, pRspUserLoginField->SystemName, sizeof(ThostRspUserLogin.SystemName) - 1);
-			//strncpy(ThostRspUserLogin.CZCETime,pRspUserLoginField->LoginTime, sizeof(ThostRspUserLogin.CZCETime) - 1);
-			//strncpy(ThostRspUserLogin.SHFETime,pRspUserLoginField->LoginTime, sizeof(ThostRspUserLogin.SHFETime) - 1);
-			//strncpy(ThostRspUserLogin.DCETime,pRspUserLoginField->LoginTime, sizeof(ThostRspUserLogin.DCETime) - 1);
-			//strncpy(ThostRspUserLogin.FFEXTime,pRspUserLoginField->LoginTime, sizeof(ThostRspUserLogin.FFEXTime) - 1);
-			//strncpy(ThostRspUserLogin.INETime,pRspUserLoginField->LoginTime, sizeof(ThostRspUserLogin.INETime) - 1);
-			m_FrontID = ThostRspUserLogin.FrontID;
-			m_SessionID = ThostRspUserLogin.SessionID;
-			pThostRspUserLogin = &ThostRspUserLogin;
-		}
-	
-		if(pRspInfo)
-		{
-			memset(&ThostRspInfo,0,sizeof(ThostRspInfo));
-			ThostRspInfo.ErrorID = pRspInfo->ErrorID;
-			strncpy(ThostRspInfo.ErrorMsg,pRspInfo->ErrorMsg,sizeof(ThostRspInfo.ErrorMsg) - 1);
-		}
+    if (m_pSpi)
+    {
+        CThostFtdcRspInfoField* pThostRspInfo = NULL;
 
-		// 查询股东账号
-		//CTORATstpQryShareholderAccountField Req;
-		//memset(&Req, 0x00, sizeof(Req));
-		//m_pUserApi->ReqQryShareholderAccount(&Req, 0);
+        if (pRspInfo)
+        {
+            memset(&ThostRspInfo, 0, sizeof(ThostRspInfo));
+            ThostRspInfo.ErrorID = pRspInfo->ErrorID;
+            strncpy(ThostRspInfo.ErrorMsg, pRspInfo->ErrorMsg, sizeof(ThostRspInfo.ErrorMsg) - 1);
+            pThostRspInfo = &ThostRspInfo;
+        }
 
-		m_pSpi->OnRspUserLogin(pThostRspUserLogin, &ThostRspInfo, nRequestID, true);
-	}
+        CThostFtdcInputOrderField* pThostInputOrder = NULL;
+        CThostFtdcInputOrderField ThostInputOrder;
+
+        //if (pInputOrderField)
+        //{
+        //	memset(&ThostInputOrder, 0x00, sizeof(ThostInputOrder));
+        //	strncpy(ThostInputOrder.BrokerID, m_BrokerID, sizeof(ThostInputOrder.BrokerID) - 1);
+        //	strncpy(ThostInputOrder.UserID, m_UserID, sizeof(ThostInputOrder.UserID) - 1);
+        //	strncpy(ThostInputOrder.InvestorID, pInputOrderField->InvestorID, sizeof(ThostInputOrder.InvestorID) - 1);
+        //	if (pInputOrderField->ExchangeID == TORA_TSTP_EXD_SSE)
+        //		strncpy(ThostInputOrder.ExchangeID, EXCHANGE_SH, sizeof(ThostInputOrder.ExchangeID) - 1);
+        //	else if (pInputOrderField->ExchangeID == TORA_TSTP_EXD_SZSE)
+        //		strncpy(ThostInputOrder.ExchangeID, EXCHANGE_SZ, sizeof(ThostInputOrder.ExchangeID) - 1);
+        //	else if (pInputOrderField->ExchangeID == TORA_TSTP_EXD_BSE)
+        //		strncpy(ThostInputOrder.ExchangeID, EXCHANGE_BSE, sizeof(ThostInputOrder.ExchangeID) - 1);
+        //	else if (pInputOrderField->ExchangeID == TORA_TSTP_EXD_HK)
+        //		strncpy(ThostInputOrder.ExchangeID, EXCHANGE_HKEX, sizeof(ThostInputOrder.ExchangeID) - 1);
+        //	strncpy(ThostInputOrder.InstrumentID, pInputOrderField->SecurityID, sizeof(ThostInputOrder.InstrumentID) - 1);
+        //	snprintf(ThostInputOrder.OrderRef, sizeof(ThostInputOrder.OrderRef), "%d", pInputOrderField->OrderRef);
+        //	if (pInputOrderField->OrderPriceType == TORA_TSTP_OPT_LimitPrice)
+        //		ThostInputOrder.OrderPriceType = THOST_FTDC_OPT_LimitPrice;
+        //	else
+        //		ThostInputOrder.OrderPriceType = THOST_FTDC_OPT_AnyPrice;
+        //	ThostInputOrder.Direction = pInputOrderField->Direction == TORA_TSTP_D_Buy ? THOST_FTDC_D_Buy : THOST_FTDC_D_Sell;
+        //	ThostInputOrder.CombOffsetFlag[0] = pInputOrderField->Direction == TORA_TSTP_D_Buy ? THOST_FTDC_OF_Open : THOST_FTDC_OF_Close;
+        //	ThostInputOrder.CombHedgeFlag[0] = THOST_FTDC_HF_Speculation;
+        //	ThostInputOrder.LimitPrice = pInputOrderField->LimitPrice;
+        //	ThostInputOrder.VolumeTotalOriginal = pInputOrderField->VolumeTotalOriginal;
+        //	ThostInputOrder.MinVolume = 0;
+
+        //	switch (pInputOrderField->TimeCondition) {
+        //	case TORA_TSTP_TC_IOC:
+        //		ThostInputOrder.TimeCondition = THOST_FTDC_TC_IOC;
+        //		break;
+        //	case TORA_TSTP_TC_GFS:
+        //		ThostInputOrder.TimeCondition = THOST_FTDC_TC_GFS;
+        //		break;
+        //	case TORA_TSTP_TC_GFD:
+        //		ThostInputOrder.TimeCondition = THOST_FTDC_TC_GFD;
+        //		break;
+        //	case TORA_TSTP_TC_GTD:
+        //		ThostInputOrder.TimeCondition = THOST_FTDC_TC_GTD;
+        //		break;
+        //	case TORA_TSTP_TC_GTC:
+        //		ThostInputOrder.TimeCondition = THOST_FTDC_TC_GTC;
+        //		break;
+        //	case TORA_TSTP_TC_GFA:
+        //		ThostInputOrder.TimeCondition = THOST_FTDC_TC_GFA;
+        //		break;
+        //	default:
+        //		break;
+        //	}
+        //
+        //	ThostInputOrder.VolumeCondition = THOST_FTDC_VC_AV;
+        //	ThostInputOrder.ContingentCondition = THOST_FTDC_CC_Immediately;
+        //	ThostInputOrder.ForceCloseReason = THOST_FTDC_FCC_NotForceClose;
+        //	ThostInputOrder.IsAutoSuspend = 0;
+        //	ThostInputOrder.UserForceClose = 0;
+        //	strncpy(ThostInputOrder.GTDDate, pInputOrderField->GTDate, sizeof(ThostInputOrder.GTDDate) - 1);
+        //	pThostInputOrder = &ThostInputOrder;
+        //}
+        m_pSpi->OnRspOrderInsert(pThostInputOrder, pThostRspInfo, nRequestID, true);
+    }
 }
+
+
+//撤单应答
+void CFtdcTraderApiImpl::OnRspOrderAction(CUTInputOrderActionField *pInputOrderAction, CUTRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
+{
+    if (m_pSpi)
+    {
+
+        CThostFtdcRspInfoField* pThostRspInfo = NULL;
+
+        if (pRspInfo)
+        {
+            memset(&ThostRspInfo, 0, sizeof(ThostRspInfo));
+            ThostRspInfo.ErrorID = pRspInfo->ErrorID;
+            strncpy(ThostRspInfo.ErrorMsg, pRspInfo->ErrorMsg, sizeof(ThostRspInfo.ErrorMsg) - 1);
+            pThostRspInfo = &ThostRspInfo;
+        }
+
+        CThostFtdcInputOrderActionField* pThostOrderAction = NULL;
+        CThostFtdcInputOrderActionField  ThostOrderAction;
+        //if (pInputOrderActionField)
+        //{
+        //	memset(&ThostOrderAction, 0, sizeof(ThostOrderAction));
+        //	if (pInputOrderActionField->ExchangeID == TORA_TSTP_EXD_SSE)
+        //		strncpy(ThostOrderAction.ExchangeID, EXCHANGE_SH, sizeof(ThostOrderAction.ExchangeID) - 1);
+        //	else if (pInputOrderActionField->ExchangeID == TORA_TSTP_EXD_SZSE)
+        //		strncpy(ThostOrderAction.ExchangeID, EXCHANGE_SZ, sizeof(ThostOrderAction.ExchangeID) - 1);
+        //	else if (pInputOrderActionField->ExchangeID == TORA_TSTP_EXD_BSE)
+        //		strncpy(ThostOrderAction.ExchangeID, EXCHANGE_BSE, sizeof(ThostOrderAction.ExchangeID) - 1);
+        //	else if (pInputOrderActionField->ExchangeID == TORA_TSTP_EXD_HK)
+        //		strncpy(ThostOrderAction.ExchangeID, EXCHANGE_HKEX, sizeof(ThostOrderAction.ExchangeID) - 1);
+        //	strncpy(ThostOrderAction.OrderSysID, pInputOrderActionField->OrderSysID, sizeof(ThostOrderAction.OrderSysID) - 1);
+        //	strncpy(ThostOrderAction.BrokerID, m_BrokerID, sizeof(ThostOrderAction.BrokerID) - 1);
+        //	strncpy(ThostOrderAction.UserID, m_UserID, sizeof(ThostOrderAction.UserID) - 1);
+        //	ThostOrderAction.SessionID = pInputOrderActionField->SessionID;
+        //	ThostOrderAction.FrontID = pInputOrderActionField->FrontID;
+        //	snprintf(ThostOrderAction.OrderRef, sizeof(ThostOrderAction.OrderRef),"%d",pInputOrderActionField->OrderRef);
+        //	ThostOrderAction.OrderActionRef = pInputOrderActionField->OrderActionRef;
+        //	ThostOrderAction.ActionFlag = pInputOrderActionField->ActionFlag == TORA_TSTP_AF_Modify ? THOST_FTDC_AF_Modify : THOST_FTDC_AF_Delete;
+        //	pThostOrderAction = &ThostOrderAction;
+        //}
+
+        m_pSpi->OnRspOrderAction(pThostOrderAction, pThostRspInfo, nRequestID, true);
+    }
+}
+
 
 ///用户退出应答
 //void CFtdcTraderApiImpl::OnRspUserLogout(CTORATstpUserLogoutField *pUserLogoutField, CTORATstpRspInfoField *pRspInfo, int nRequestID)
@@ -1047,191 +1142,14 @@ void CFtdcTraderApiImpl::OnRspLogin(CUTRspLoginField *pRspUserLoginField, CUTRsp
 //	}
 //}
 
-///用户密码修改应答
-void CFtdcTraderApiImpl::OnRspUserPasswordUpdate(CUTUserPasswordUpdateField *pUserPasswordUpdateField, CUTRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
-{
-	if(m_pSpi != NULL)
-	{
-		CThostFtdcUserPasswordUpdateField*  pThostUserPasswordUpdate=NULL;
-		CThostFtdcUserPasswordUpdateField  ThostUserPasswordUpdate;	
-		
-			
-		if(pUserPasswordUpdateField)
-		{
-			memset(&ThostUserPasswordUpdate,0,sizeof(ThostUserPasswordUpdate));
-			strncpy(ThostUserPasswordUpdate.UserID, m_UserID,sizeof(ThostUserPasswordUpdate.UserID)-1);
-			strncpy(ThostUserPasswordUpdate.OldPassword, pUserPasswordUpdateField->OldPassword,sizeof(ThostUserPasswordUpdate.OldPassword)-1);
-			strncpy(ThostUserPasswordUpdate.NewPassword, pUserPasswordUpdateField->NewPassword,sizeof(ThostUserPasswordUpdate.NewPassword)-1);
-			pThostUserPasswordUpdate = &ThostUserPasswordUpdate;
-		}
-
-		CThostFtdcRspInfoField*  pThostRspInfo=NULL;
-		CThostFtdcRspInfoField  ThostRspInfo;	
-			
-		if(NULL!=pRspInfo)
-		{
-			memset(&ThostRspInfo,0,sizeof(ThostRspInfo));
-			ThostRspInfo.ErrorID = pRspInfo->ErrorID;
-			strncpy(ThostRspInfo.ErrorMsg,pRspInfo->ErrorMsg,sizeof(ThostRspInfo.ErrorMsg)-1);
-			pThostRspInfo = &ThostRspInfo;
-		}
-		m_pSpi->OnRspUserPasswordUpdate(pThostUserPasswordUpdate, pThostRspInfo, nRequestID, true);
-	}
-}
-
-
-
-///合约查询应答
-void CFtdcTraderApiImpl::OnRspQryInstrument(CUTInstrumentField *pSecurity, CUTRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
-{
-	if(m_pSpi)
-	{
-		//CThostFtdcInstrumentField*  pThostInstrument=NULL;
-		//CThostFtdcInstrumentField  ThostInstrument;
-		//if(pSecurity)
-		//{
-		//	memset(&ThostInstrument,0,sizeof(ThostInstrument));
-		//	if (pSecurity->ExchangeID == TORA_TSTP_EXD_SSE)
-		//		strncpy(ThostInstrument.ExchangeID, EXCHANGE_SH, sizeof(ThostInstrument.ExchangeID) - 1);
-		//	else if (pSecurity->ExchangeID == TORA_TSTP_EXD_SZSE)
-		//		strncpy(ThostInstrument.ExchangeID, EXCHANGE_SZ, sizeof(ThostInstrument.ExchangeID) - 1);
-		//	else if (pSecurity->ExchangeID == TORA_TSTP_EXD_BSE)
-		//		strncpy(ThostInstrument.ExchangeID, EXCHANGE_BSE, sizeof(ThostInstrument.ExchangeID) - 1);
-		//	else if (pSecurity->ExchangeID == TORA_TSTP_EXD_HK)
-		//		strncpy(ThostInstrument.ExchangeID, EXCHANGE_HKEX, sizeof(ThostInstrument.ExchangeID) - 1);
-		//	strncpy(ThostInstrument.InstrumentID,pSecurity->SecurityID,sizeof(ThostInstrument.InstrumentID)-1);
-		//	strncpy(ThostInstrument.ExchangeInstID,pSecurity->SecurityID,sizeof(ThostInstrument.ExchangeInstID)-1);
-		//	strncpy(ThostInstrument.InstrumentName,pSecurity->SecurityName,sizeof(ThostInstrument.InstrumentName)-1);
-		//	ThostInstrument.ProductID[0] = pSecurity->ProductID;
-		//	ThostInstrument.VolumeMultiple = pSecurity->VolumeMultiple;
-		//	ThostInstrument.PriceTick = pSecurity->PriceTick;
-		//	ThostInstrument.IsTrading = true;
-		//	ThostInstrument.PositionType = THOST_FTDC_PT_Net;
-		//	ThostInstrument.PositionDateType = THOST_FTDC_PDT_UseHistory;
-		//	ThostInstrument.OptionsType = THOST_FTDC_CP_CallOptions;
-		//	strncpy(ThostInstrument.OpenDate, pSecurity->OpenDate, sizeof(ThostInstrument.OpenDate) - 1);
-		//	strncpy(ThostInstrument.CreateDate, pSecurity->OpenDate, sizeof(ThostInstrument.CreateDate) - 1);
-		//	// 类型
-		//	switch (pSecurity->ProductID) {
-		//	case TORA_TSTP_PID_SHStock: // 上海股票
-		//	case TORA_TSTP_PID_SZStock: // 深圳股票
-		//	case TORA_TSTP_PID_SZSEHKMain: // 深港通港股主板
-		//	case TORA_TSTP_PID_SHKC: // 上海科创板
-		//	case TORA_TSTP_PID_SZSEHKNasdaqAMX: // 深港通港股NasdaqAMX市场
-		//	case TORA_TSTP_PID_SZSEHKGEM: // 深港通港股创业板
-		//	case TORA_TSTP_PID_SZSEHKETS: // 深港通港股扩充交易证券
-		//		ThostInstrument.ProductClass = OPENCTP_FTDC_PC_EQUITY;
-		//		break;
-		//	case TORA_TSTP_PID_SHBond: // 上海债券
-		//	case TORA_TSTP_PID_SHStandard: // 上海标准券
-		//	case TORA_TSTP_PID_SHRepurchase: // 上海质押式回购
-		//	case TORA_TSTP_PID_SZBond: // 深圳债券
-		//	case TORA_TSTP_PID_SZStandard: // 深圳标准券
-		//	case TORA_TSTP_PID_SZRepurchase: // 深圳质押式回购
-		//		ThostInstrument.ProductClass = OPENCTP_FTDC_PC_BOND; // 债券
-		//		break;
-		//	case TORA_TSTP_PID_SHFund: // 上海基金
-		//	case TORA_TSTP_PID_SZFund: // 深圳基金
-		//		ThostInstrument.ProductClass = OPENCTP_FTDC_PC_FUND; // 基金
-		//		break;
-		//	default:
-		//		ThostInstrument.ProductClass = OPENCTP_FTDC_PC_EQUITY;
-		//		break;
-		//	}
-		//	ThostInstrument.InstLifePhase = THOST_FTDC_IP_Started;
-		//	ThostInstrument.MaxMarginSideAlgorithm=THOST_FTDC_MMSA_NO;
-		//	ThostInstrument.CombinationType = THOST_FTDC_COMBT_Future;
-		//	ThostInstrument.LongMarginRatio = 1.0;
-		//	ThostInstrument.ShortMarginRatio = 1.0;
-		//	strcpy(ThostInstrument.OpenDate, pSecurity->OpenDate);
-		//	ThostInstrument.MaxLimitOrderVolume = pSecurity->MaxLimitOrderBuyVolume;
-		//	ThostInstrument.MinLimitOrderVolume = pSecurity->MinLimitOrderBuyVolume;
-		//	ThostInstrument.MaxMarketOrderVolume = pSecurity->MaxMarketOrderBuyVolume;
-		//	ThostInstrument.MinMarketOrderVolume = pSecurity->MinMarketOrderBuyVolume;
-		//	pThostInstrument = &ThostInstrument;
-		//}
-		//CThostFtdcRspInfoField*  pThostRspInfo=NULL;
-		//CThostFtdcRspInfoField  ThostRspInfo;
-		//if(NULL!=pRspInfo)
-		//{
-		//	memset(&ThostRspInfo,0,sizeof(ThostRspInfo));
-		//	ThostRspInfo.ErrorID = pRspInfo->ErrorID;
-		//	strncpy(ThostRspInfo.ErrorMsg,pRspInfo->ErrorMsg,sizeof(ThostRspInfo.ErrorMsg)-1);
-		//	pThostRspInfo = &ThostRspInfo;
-		//}
-		
-		//m_pSpi->OnRspQryInstrument(pThostInstrument, pThostRspInfo, nRequestID, bIsLast);
-	}
-}
-
-//投资者持仓查询
-void CFtdcTraderApiImpl::OnRspQryPosition(CTORATstpPositionField* pPosition, CTORATstpRspInfoField* pRspInfo, int nRequestID, bool bIsLast)
-{
-	if (m_pSpi)
-	{
-		CThostFtdcRspInfoField* pThostRspInfo = NULL;
-		CThostFtdcRspInfoField  ThostRspInfo;
-
-		if (pRspInfo)
-		{
-			memset(&ThostRspInfo, 0, sizeof(ThostRspInfo));
-			ThostRspInfo.ErrorID = pRspInfo->ErrorID;
-			strncpy(ThostRspInfo.ErrorMsg, pRspInfo->ErrorMsg, sizeof(ThostRspInfo.ErrorMsg) - 1);
-			pThostRspInfo = &ThostRspInfo;
-		}
-
-		CThostFtdcInvestorPositionField* pThostRspInvestorPosition = NULL;
-		CThostFtdcInvestorPositionField  ThostRspInvestorPosition;
-
-		if (pPosition)
-		{
-			memset(&ThostRspInvestorPosition, 0, sizeof(ThostRspInvestorPosition));
-			strncpy(ThostRspInvestorPosition.BrokerID, m_BrokerID, sizeof(ThostRspInvestorPosition.BrokerID) - 1);
-			strncpy(ThostRspInvestorPosition.InvestorID, m_UserID, sizeof(ThostRspInvestorPosition.InvestorID) - 1);
-			if(pPosition->ExchangeID== TORA_TSTP_EXD_SSE)
-				strncpy(ThostRspInvestorPosition.ExchangeID, EXCHANGE_SH, sizeof(ThostRspInvestorPosition.ExchangeID) - 1);
-			else if(pPosition->ExchangeID== TORA_TSTP_EXD_SZSE)
-				strncpy(ThostRspInvestorPosition.ExchangeID, EXCHANGE_SZ, sizeof(ThostRspInvestorPosition.ExchangeID) - 1);
-			else if (pPosition->ExchangeID == TORA_TSTP_EXD_BSE)
-				strncpy(ThostRspInvestorPosition.ExchangeID, EXCHANGE_BSE, sizeof(ThostRspInvestorPosition.ExchangeID) - 1);
-			else if (pPosition->ExchangeID == TORA_TSTP_EXD_HK)
-				strncpy(ThostRspInvestorPosition.ExchangeID, EXCHANGE_HKEX, sizeof(ThostRspInvestorPosition.ExchangeID) - 1);
-
-			strncpy(ThostRspInvestorPosition.InstrumentID, pPosition->SecurityID, sizeof(ThostRspInvestorPosition.InstrumentID) - 1);
-			strncpy(ThostRspInvestorPosition.TradingDay, TradingDay, sizeof(ThostRspInvestorPosition.TradingDay) - 1);
-			ThostRspInvestorPosition.HedgeFlag = THOST_FTDC_HF_Speculation;
-			ThostRspInvestorPosition.UseMargin = 0;
-			ThostRspInvestorPosition.FrozenMargin = 0;
-
-			//上海期货交易所的持仓有两条，分为昨持仓和今持仓
-			ThostRspInvestorPosition.PosiDirection = THOST_FTDC_PD_Long; // A股只有多仓
-			ThostRspInvestorPosition.Position = pPosition->CurrentPosition;
-			ThostRspInvestorPosition.PositionCost = pPosition->TotalPosCost;
-			ThostRspInvestorPosition.YdPosition = pPosition->PrePosition;
-			ThostRspInvestorPosition.LongFrozen = 0;
-			ThostRspInvestorPosition.ShortFrozen = pPosition->HistoryPosFrozen;
-			ThostRspInvestorPosition.PositionDate = THOST_FTDC_PSD_Today;
-			ThostRspInvestorPosition.OpenVolume = 0;
-			ThostRspInvestorPosition.CloseVolume = 0;
-			ThostRspInvestorPosition.OpenCost = pPosition->OpenPosCost;
-			ThostRspInvestorPosition.PositionProfit = 0;
-			ThostRspInvestorPosition.CloseProfit = 0;
-			ThostRspInvestorPosition.TodayPosition = pPosition->CurrentPosition - pPosition->HistoryPos;
-			m_pSpi->OnRspQryInvestorPosition(&ThostRspInvestorPosition, pThostRspInfo, nRequestID, bIsLast);
-		}
-		else {
-			m_pSpi->OnRspQryInvestorPosition(pThostRspInvestorPosition, pThostRspInfo, nRequestID, bIsLast);
-		}
-	}
-}
 
 //报单查询
-void CFtdcTraderApiImpl::OnRspQryOrder(CUTOrderField* pOrder, CUTRspInfoField* pRspInfo, int nRequestID, bool bIsLast)
+void CFtdcTraderApiImpl::OnRspQryOrder(CUTOrderField *pOrder, CUTRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
 {
 	if (m_pSpi)
 	{
-		//CThostFtdcOrderField* pThostOrder = NULL;
-		//CThostFtdcOrderField  ThostOrder;
+		CThostFtdcOrderField* pThostOrder = NULL;
+		CThostFtdcOrderField  ThostOrder;
 		//if (pOrder)
 		//{
 		//	memset(&ThostOrder, 0x00, sizeof(ThostOrder));
@@ -1329,27 +1247,26 @@ void CFtdcTraderApiImpl::OnRspQryOrder(CUTOrderField* pOrder, CUTRspInfoField* p
 		//	strncpy(ThostOrder.InvestUnitID, pOrder->BusinessUnitID, sizeof(ThostOrder.InvestUnitID) - 1);
 		//	pThostOrder = &ThostOrder;
 		//}
-		//CThostFtdcRspInfoField* pThostRspInfo = NULL;
-		//CThostFtdcRspInfoField  ThostRspInfo;
-		//if (pRspInfo)
-		//{
-		//	memset(&ThostRspInfo, 0, sizeof(ThostRspInfo));
-		//	ThostRspInfo.ErrorID = pRspInfo->ErrorID;
-		//	strncpy(ThostRspInfo.ErrorMsg, pRspInfo->ErrorMsg, sizeof(ThostRspInfo.ErrorMsg) - 1);
-		//	pThostRspInfo = &ThostRspInfo;
-		//}
-		//m_pSpi->OnRspQryOrder(pThostOrder, pThostRspInfo, nRequestID, bIsLast);
+		CThostFtdcRspInfoField* pThostRspInfo = NULL;
+		CThostFtdcRspInfoField  ThostRspInfo;
+		if (pRspInfo)
+		{
+			memset(&ThostRspInfo, 0, sizeof(ThostRspInfo));
+			ThostRspInfo.ErrorID = pRspInfo->ErrorID;
+			strncpy(ThostRspInfo.ErrorMsg, pRspInfo->ErrorMsg, sizeof(ThostRspInfo.ErrorMsg) - 1);
+			pThostRspInfo = &ThostRspInfo;
+		}
+		m_pSpi->OnRspQryOrder(pThostOrder, pThostRspInfo, nRequestID, bIsLast);
 	}
 }
 
-
 //成交查询
-void CFtdcTraderApiImpl::OnRspQryTrade(CUTTradeField* pTrade, CUTRspInfoField* pRspInfo, int nRequestID, bool bIsLast)
+void CFtdcTraderApiImpl::OnRspQryTrade(CUTTradeField *pTrade, CUTRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
 {
 	if (m_pSpi)
 	{
-		//CThostFtdcTradeField* pThostTrade = NULL;
-		//CThostFtdcTradeField  ThostTrade;
+		CThostFtdcTradeField* pThostTrade = NULL;
+		CThostFtdcTradeField  ThostTrade;
 		//if (pTrade)
 		//{
 		//	memset(&ThostTrade, 0, sizeof(ThostTrade));
@@ -1383,8 +1300,8 @@ void CFtdcTraderApiImpl::OnRspQryTrade(CUTTradeField* pTrade, CUTRspInfoField* p
 		//	pThostTrade = &ThostTrade;
 		//}
 
-		//CThostFtdcRspInfoField* pThostRspInfo = NULL;
-		//CThostFtdcRspInfoField  ThostRspInfo;
+		CThostFtdcRspInfoField* pThostRspInfo = NULL;
+		CThostFtdcRspInfoField  ThostRspInfo;
 		//if (pRspInfo)
 		//{
 		//	memset(&ThostRspInfo, 0, sizeof(ThostRspInfo));
@@ -1392,16 +1309,15 @@ void CFtdcTraderApiImpl::OnRspQryTrade(CUTTradeField* pTrade, CUTRspInfoField* p
 		//	strncpy(ThostRspInfo.ErrorMsg, pRspInfo->ErrorMsg, sizeof(ThostRspInfo.ErrorMsg) - 1);
 		//	pThostRspInfo = &ThostRspInfo;
 		//}
-		//m_pSpi->OnRspQryTrade(pThostTrade, pThostRspInfo, nRequestID, bIsLast);
+		m_pSpi->OnRspQryTrade(pThostTrade, pThostRspInfo, nRequestID, bIsLast);
 	}
 }
 
 //报单回报
-void CFtdcTraderApiImpl::OnRtnOrder(CUTOrderField* pOrder)
+void CFtdcTraderApiImpl::OnRtnOrder(CUTOrderField *pOrder)
 {
 	if (m_pSpi) {
-		//CThostFtdcOrderField Order;
-		//memset(&Order, 0x00, sizeof(Order));
+		CThostFtdcOrderField Order = {0};
 		//strncpy(Order.BrokerID, m_BrokerID, sizeof(Order.BrokerID) - 1);
 		//strncpy(Order.UserID, m_UserID,sizeof(Order.UserID)-1);
 		//strncpy(Order.AccountID, pOrder->AccountID, sizeof(Order.AccountID) - 1);
@@ -1502,7 +1418,7 @@ void CFtdcTraderApiImpl::OnRtnOrder(CUTOrderField* pOrder)
 }
 
 //成交回报
-void CFtdcTraderApiImpl::OnRtnTrade(CUTTradeField* pTrade)
+void CFtdcTraderApiImpl::OnRtnTrade(CUTTradeField *pTrade)
 {
 	if (m_pSpi)
 	{
@@ -1542,7 +1458,7 @@ void CFtdcTraderApiImpl::OnRtnTrade(CUTTradeField* pTrade)
 }
 
 //查询投资者
-void CFtdcTraderApiImpl::OnRspQryInvestor(CUTInvestorField* pInvestor, CUTRspInfoField* pRspInfo, int nRequestID, bool bIsLast)
+void CFtdcTraderApiImpl::OnRspQryInvestor(CUTInvestorField *pInvestor, CUTRspInfoField *pRspInfo, int nRequestID, bool bIsLast)
 {
 	if (m_pSpi)
 	{
@@ -1561,14 +1477,14 @@ void CFtdcTraderApiImpl::OnRspQryInvestor(CUTInvestorField* pInvestor, CUTRspInf
 
 		if (pInvestor)
 		{
-			memset(&ThostInvestor, 0x00, sizeof(ThostInvestor));
-			strncpy(ThostInvestor.BrokerID, m_BrokerID, sizeof(ThostInvestor.BrokerID) - 1);
-			strncpy(ThostInvestor.InvestorID, pInvestor->InvestorID, sizeof(ThostInvestor.InvestorID) - 1);
-			strncpy(ThostInvestor.InvestorName, pInvestor->InvestorName, sizeof(ThostInvestor.InvestorName) - 1);
+			//memset(&ThostInvestor, 0x00, sizeof(ThostInvestor));
+			//strncpy(ThostInvestor.BrokerID, m_BrokerID, sizeof(ThostInvestor.BrokerID) - 1);
+			//strncpy(ThostInvestor.InvestorID, pInvestor->InvestorID, sizeof(ThostInvestor.InvestorID) - 1);
+			//strncpy(ThostInvestor.InvestorName, pInvestor->InvestorName, sizeof(ThostInvestor.InvestorName) - 1);
 			//strncpy(ThostInvestor.IdentifiedCardNo, pInvestor->IdCardNo, sizeof(ThostInvestor.IdentifiedCardNo)-1);
-			strncpy(ThostInvestor.Mobile, pInvestor->Mobile, sizeof(ThostInvestor.Mobile) - 1);
-			ThostInvestor.IsActive = 1;
-			pThostInvestor = &ThostInvestor;
+			//strncpy(ThostInvestor.Mobile, pInvestor->Mobile, sizeof(ThostInvestor.Mobile) - 1);
+			//ThostInvestor.IsActive = 1;
+			//pThostInvestor = &ThostInvestor;
 		}
 		return m_pSpi->OnRspQryInvestor(pThostInvestor, pThostRspInfo, nRequestID, bIsLast);
 	}
@@ -1621,6 +1537,7 @@ void CFtdcTraderApiImpl::OnRspQryInvestor(CUTInvestorField* pInvestor, CUTRspInf
 //		return m_pSpi->OnRspQryInstrumentCommissionRate(pThostInvestorFee, pThostRspInfo, nRequestID, bIsLast);
 //	}
 //}
+
 ///报价查询请求
 int CFtdcTraderApiImpl::ReqQryQuote(CThostFtdcQryQuoteField* pQryQuote, int nRequestID)
 {

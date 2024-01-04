@@ -409,7 +409,7 @@ private:
     ///用户登入应答
     virtual void OnRspLogin(CUTRspLoginField *pRspLogin, CUTRspInfoField *pRspInfo, int nRequestID, bool bIsLast);
 
-    /*登出应答*/
+	/*登出应答*/
 	//virtual void OnRspUserLogout(CTORATstpUserLogoutField *pUserLogoutField, CTORATstpRspInfoField *pRspInfo, int nRequestID);
 
     ///密码修改应答
@@ -430,11 +430,14 @@ private:
     ///请求查询资金响应
     virtual void OnRspQryTradingAccount(CUTTradingAccountField *pTradingAccount, CUTRspInfoField *pRspInfo, int nRequestID, bool bIsLast);
 
+    ///报单错误回报
+    virtual void OnRspOrderInsert(CUTInputOrderField *pInputOrder, CUTRspInfoField *pRspInfo, int nRequestID, bool bIsLast);
+
     ///报单
     virtual void OnRtnOrder(CUTOrderField *pOrder);
 
-    ///报单错误回报
-    virtual void OnRspOrderInsert(CUTInputOrderField *pInputOrder, CUTRspInfoField *pRspInfo, int nRequestID, bool bIsLast);
+	//报单错误回报
+	//virtual void OnErrRtnOrderInsert(CTORATstpInputOrderField* pInputOrder, CTORATstpRspInfoField* pRspInfo) {};
 
     ///报单操作回报
     virtual void OnRspOrderAction(CUTInputOrderActionField *pInputOrderAction, CUTRspInfoField *pRspInfo, int nRequestID, bool bIsLast);
@@ -457,9 +460,87 @@ private:
     ///请求查询行情响应
     virtual void OnRspQryDepthMarketData(CUTDepthMarketDataField *pDepthMarketData, CUTRspInfoField *pRspInfo, int nRequestID, bool bIsLast);
 
-    //查询佣金费率
+	//查询佣金费率
 	//void OnRspQryInvestorTradingFee(CTORATstpInvestorTradingFeeField* pInvestorTradingFee, CTORATstpRspInfoField* pRspInfo, int nRequestID, bool bIsLast);
 
+    ///请求查询手续费率响应
+    virtual void OnRspQryInstrumentCommissionRate(CUTInstrumentCommissionRateField *pInstrumentCommissionRate, CUTRspInfoField *pRspInfo, int nRequestID, bool bIsLast);
+
+
+    /* 以下未实现
+    //请求后台不支持的功能时调用
+    virtual void OnRspError(CUTRspInfoField *pRspInfo, int nRequestID, bool bIsLast){};
+    ///转账错误回报
+    virtual void OnRspTransferInsert(CUTInputTransferField *pInputTransfer, CUTRspInfoField *pRspInfo, int nRequestID, bool bIsLast) {};
+    ///转账
+    virtual void OnRtnTransfer(CUTTransferField *pTransfer) {};
+    ///直接还款错误回报
+    virtual void OnRspFundPaybackInsert(CUTInputFundPaybackField *pInputFundPayback, CUTRspInfoField *pRspInfo, int nRequestID, bool bIsLast) {};
+    ///直接还款
+    virtual void OnRtnFundPayback(CUTFundPaybackField *pFundPayback) {};
+    ///直接还券错误回报
+    virtual void OnRspStockPaybackInsert(CUTInputStockPaybackField *pInputStockPayback, CUTRspInfoField *pRspInfo, int nRequestID, bool bIsLast) {};
+    ///直接还券
+    virtual void OnRtnStockPayback(CUTStockPaybackField *pStockPayback) {};
+    ///同步组件返回的券源保底额度信息
+    virtual void OnRtnPrivateCreditStock(CUTPrivateCreditStockField *pPrivateCreditStock) {};
+    ///锁定
+    virtual void OnRtnLock(CUTLockField *pLock) {};
+    ///锁定错误回报
+    virtual void OnRspLockInsert(CUTInputLockField *pInputLock, CUTRspInfoField *pRspInfo, int nRequestID, bool bIsLast) {};
+    ///行权
+    virtual void OnRtnExecOrder(CUTExecOrderField *pExecOrder) {};
+    ///行权错误回报
+    virtual void OnRspExecOrderInsert(CUTInputExecOrderField *pInputExecOrder, CUTRspInfoField *pRspInfo, int nRequestID, bool bIsLast) {};
+    ///行权操作回报
+    virtual void OnRspExecOrderAction(CUTInputExecOrderActionField *pInputExecOrderAction, CUTRspInfoField *pRspInfo, int nRequestID, bool bIsLast) {};
+    ///行权操作回报
+    virtual void OnErrRtnExecOrderAction(CUTExecOrderActionField *pExecOrderAction) {};
+    ///请求查询期权合约每手保证金响应
+    virtual void OnRspQryOptionInstrMarginByVolume(CUTOptionInstrMarginByVolumeField *pOptionInstrMarginByVolume, CUTRspInfoField *pRspInfo, int nRequestID, bool bIsLast) {};
+    ///请求查询期权手续费率响应
+    virtual void OnRspQryOptionInstrCommRate(CUTOptionInstrCommRateField *pOptionInstrCommRate, CUTRspInfoField *pRspInfo, int nRequestID, bool bIsLast) {};
+    ///请求查询转账响应
+    virtual void OnRspQryTransfer(CUTTransferField *pTransfer, CUTRspInfoField *pRspInfo, int nRequestID, bool bIsLast) {};
+    ///请求查询交易编码
+    virtual void OnRspQryTradingCode(CUTTradingCodeField *pTradingCode, CUTRspInfoField *pRspInfo, int nRequestID, bool bIsLast) {};
+    ///查询最大下单量响应
+    virtual void OnRspQryMaxOrderVolume(CUTMaxOrderVolumeField *pMaxOrderVolume, CUTRspInfoField *pRspInfo, int nRequestID, bool bIsLast) {};
+    ///请求查询信用合约属性响应
+    virtual void OnRspQryCreditInstrument(CUTCreditInstrumentField *pCreditInstrument, CUTRspInfoField *pRspInfo, int nRequestID, bool bIsLast) {};
+    ///请求查询投资者信用信息响应
+    virtual void OnRspQryCreditInvestor(CUTCreditInvestorField *pCreditInvestor, CUTRspInfoField *pRspInfo, int nRequestID, bool bIsLast) {};
+    ///请求查询投资者可融券响应
+    virtual void OnRspQryPrivateCreditStock(CUTPrivateCreditStockField *pPrivateCreditStock, CUTRspInfoField *pRspInfo, int nRequestID, bool bIsLast) {};
+    ///请求查询集中度参数响应
+    virtual void OnRspQryCreditConcentration(CUTCreditConcentrationField *pCreditConcentration, CUTRspInfoField *pRspInfo, int nRequestID, bool bIsLast) {};
+    ///请求查询投资者融资明细响应
+    virtual void OnRspQryCreditFundDetail(CUTCreditFundDetailField *pCreditFundDetail, CUTRspInfoField *pRspInfo, int nRequestID, bool bIsLast) {};
+    ///请求查询投资者融券明细响应
+    virtual void OnRspQryCreditStockDetail(CUTCreditStockDetailField *pCreditStockDetail, CUTRspInfoField *pRspInfo, int nRequestID, bool bIsLast) {};
+    ///请求查询投资者直接还款响应
+    virtual void OnRspQryFundPayback(CUTFundPaybackField *pFundPayback, CUTRspInfoField *pRspInfo, int nRequestID, bool bIsLast) {};
+    ///请求查询投资者直接还券响应
+    virtual void OnRspQryStockPayback(CUTStockPaybackField *pStockPayback, CUTRspInfoField *pRspInfo, int nRequestID, bool bIsLast) {};
+    ///请求查询公有融资额度响应
+    virtual void OnRspQryPublicCreditFund(CUTPublicCreditFundField *pPublicCreditFund, CUTRspInfoField *pRspInfo, int nRequestID, bool bIsLast) {};
+    ///请求查询ETF信息响应
+    virtual void OnRspQryETFInfo(CUTETFInfoField *pETFInfo, CUTRspInfoField *pRspInfo, int nRequestID, bool bIsLast) {};
+    ///请求查询ETF成分股响应
+    virtual void OnRspQryETFComponent(CUTETFComponentField *pETFComponent, CUTRspInfoField *pRspInfo, int nRequestID, bool bIsLast) {};
+    ///请求查询保证金可用余额明细响应
+    virtual void OnRspQryCreditAvailableDetail(CUTCreditAvailableDetailField *pCreditAvailableDetail, CUTRspInfoField *pRspInfo, int nRequestID, bool bIsLast) {};
+    ///请求查询锁定响应
+    virtual void OnRspQryLock(CUTLockField *pLock, CUTRspInfoField *pRspInfo, int nRequestID, bool bIsLast) {};
+    ///请求查询行权响应
+    virtual void OnRspQryExecOrder(CUTExecOrderField *pExecOrder, CUTRspInfoField *pRspInfo, int nRequestID, bool bIsLast) {};
+    ///请求查询锁定仓位响应
+    virtual void OnRspQryLockPosition(CUTLockPositionField *pLockPosition, CUTRspInfoField *pRspInfo, int nRequestID, bool bIsLast) {};
+    ///请求查询期权限仓响应
+    virtual void OnRspQryOptPosiLimit(CUTOptPosiLimitField *pOptPosiLimit, CUTRspInfoField *pRspInfo, int nRequestID, bool bIsLast) {};
+    ///请求查询期权限额响应
+    virtual void OnRspQryOptAmountLimit(CUTOptAmountLimitField *pOptAmountLimit, CUTRspInfoField *pRspInfo, int nRequestID, bool bIsLast) {};
+    */
 private:
 	TThostFtdcInvestorIDType m_InvestorID;
 	TThostFtdcUserIDType m_UserID;
